@@ -336,7 +336,7 @@ int ANNImplementation::Compute(
     return ier;
 
   // initialize energy and forces
-    const int Nparticles = cachedNumberContributingParticles_;
+	const int Nparticles = cachedNumberOfParticles_;
   if (isComputeEnergy == true) {
     *energy = 0.0;
   }
@@ -636,7 +636,7 @@ int ANNImplementation::Compute(
     AllocateAndInitialize2DArray(dEdGC_avg, Ncontrib, Ndescriptors);
 
     // do multiple runs to get the average
-    int NUM_EVALS = 200;
+    int NUM_EVALS = 1;
     double** Epart_all;   // compute the standard deviation of atom energy
     AllocateAndInitialize2DArray(Epart_all, NUM_EVALS, Ncontrib);
 
