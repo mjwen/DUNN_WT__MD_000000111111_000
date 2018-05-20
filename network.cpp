@@ -1,4 +1,5 @@
 #include "network.h"
+#include <unistd.h>
 
 
 // Nothing to do at this moment
@@ -146,8 +147,11 @@ RowMatrixXd NeuralNetwork::dropout_(RowMatrixXd const& x, int layer)
   double keep_prob = keep_prob_[layer];
 
   if (keep_prob < 1-1e-10) {
+
     // uniform [-1, 1]
+    std::srand((unsigned int) time(0)*getpid());   // random seed
     RowMatrixXd random = RowMatrixXd::Random(1, x.cols());
+
     // uniform [keep_prob, 1+keep_prob] .floor()
     random =( (random/2.).array() + 0.5 + keep_prob ).floor();
 
