@@ -636,7 +636,7 @@ int ANNImplementation::Compute(
     AllocateAndInitialize2DArray(dEdGC_avg, Ncontrib, Ndescriptors);
 
     // do multiple runs to get the average
-    int NUM_EVALS = 1;
+    int NUM_EVALS = 50;
     double** Epart_all;   // compute the standard deviation of atom energy
     AllocateAndInitialize2DArray(Epart_all, NUM_EVALS, Ncontrib);
 
