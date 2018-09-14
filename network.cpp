@@ -3,7 +3,10 @@
 
 
 // Nothing to do at this moment
-NeuralNetwork::NeuralNetwork(){}
+NeuralNetwork::NeuralNetwork(){
+
+    std::srand((unsigned int) time(0)*getpid());   // random seed
+  }
 
 NeuralNetwork::~NeuralNetwork(){}
 
@@ -149,7 +152,6 @@ RowMatrixXd NeuralNetwork::dropout_(RowMatrixXd const& x, int layer)
   if (keep_prob < 1-1e-10) {
 
     // uniform [-1, 1]
-    std::srand((unsigned int) time(0)*getpid());   // random seed
     RowMatrixXd random = RowMatrixXd::Random(1, x.cols());
 
     // uniform [keep_prob, 1+keep_prob] .floor()
