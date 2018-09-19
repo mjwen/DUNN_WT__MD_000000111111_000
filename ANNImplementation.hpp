@@ -374,6 +374,8 @@ int ANNImplementation::Compute(
     const int Ndescriptors = descriptor_->get_num_descriptors();
     AllocateAndInitialize2DArray(GC, Ncontrib, Ndescriptors);
     AllocateAndInitialize3DArray(dGCdr, Ncontrib, Ndescriptors, DIM*Nparticles);
+    double** single_forces;
+    AllocateAndInitialize2DArray(single_forces, Nparticles, 3);
 
 
     // calculate generalized coordiantes
@@ -640,6 +642,26 @@ int ANNImplementation::Compute(
     double** Epart_all;   // compute the standard deviation of atom energy
     AllocateAndInitialize2DArray(Epart_all, NUM_EVALS, Ncontrib);
 
+
+
+
+
+
+    std::ofstream fp0;
+    fp0.open("hi_coords.txt", std::ios_base::app);   // append mode
+    fp0<<"#=========="<<std::endl;
+    fp0<<std::scientific;
+    for (int ip=0; ip<Nparticles; ip++) {
+      fp0 << coordinates[ip][0] << " "<< coordinates[ip][1] << " "<< coordinates[ip][2] << std::endl;
+    }
+    fp0.close();
+
+
+
+    std::ofstream fp;
+    fp.open("hi_forces.txt", std::ios_base::app);   // append mode
+    fp<<"#=========="<<std::endl;
+
     for(int iev=0; iev<NUM_EVALS; iev++) {
 
       // NN feedforward
@@ -677,9 +699,28 @@ int ANNImplementation::Compute(
             dEdGC_avg[i][j] += dEdGC[i*Ndescriptors + j] / NUM_EVALS;
           }
         }
+
+        for (int i=0; i<Nparticles; i++)
+          for (int j=0; j<3; j++)
+            single_forces[i][j] = 0.0;
+
+        for (int i=0; i<Ncontrib; i++)
+          for (int j=0; j<Ndescriptors; j++)
+            for (int k=0; k<Nparticles; k++)
+              for (int kdim=0; kdim<DIM; kdim++)
+                single_forces[lr[k]][kdim] += dEdGC[i*Ndescriptors + j]  * dGCdr[i][j][k*DIM + kdim];
+
+      }
+
+
+      fp<<"# evaluation "<< iev <<std::endl;
+      fp<<std::scientific;
+      for (int ip=0; ip<Nparticles; ip++) {
+        fp << single_forces[ip][0] << " "<< single_forces[ip][1] << " "<< single_forces[ip][2] << std::endl;
       }
 
     }
+    fp.close();
 
 
     // compute mean and stdev of energy
@@ -687,9 +728,9 @@ int ANNImplementation::Compute(
     double stdev;
     ComputeMeanAndStdev(E_all, mean, stdev);
 
-    std::ofstream fp;
-    fp.open("energy_mean_stdev.txt", std::ios_base::app);   // append mode
-    fp << std::setprecision(16) << mean<< "    " <<stdev <<std::endl;
+//    std::ofstream fp;
+//    fp.open("energy_mean_stdev.txt", std::ios_base::app);   // append mode
+//    fp << std::setprecision(16) << mean<< "    " <<stdev <<std::endl;
 
     // write std per atom
 /*    std::ofstream fp2;
@@ -731,6 +772,7 @@ int ANNImplementation::Compute(
     Deallocate1DArray(Epart_avg);
     Deallocate2DArray(Epart_all);
     Deallocate2DArray(dEdGC_avg);
+    Deallocate2DArray(single_forces);
 
   }  // loop over i_lr
 
