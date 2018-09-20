@@ -650,6 +650,7 @@ int ANNImplementation::Compute(
     std::ofstream fp0;
     fp0.open("hi_coords.txt", std::ios_base::app);   // append mode
     fp0<<"#=========="<<std::endl;
+    fp0<<"# " <<Nparticles<< "  # Nparticles"<<std::endl;
     fp0<<std::scientific;
     for (int ip=0; ip<Nparticles; ip++) {
       fp0 << coordinates[ip][0] << " "<< coordinates[ip][1] << " "<< coordinates[ip][2] << std::endl;
@@ -661,6 +662,8 @@ int ANNImplementation::Compute(
     std::ofstream fp;
     fp.open("hi_forces.txt", std::ios_base::app);   // append mode
     fp<<"#=========="<<std::endl;
+    fp<<"# " <<Nparticles<< "  # Nparticles"<<std::endl;
+    fp<<"# " <<NUM_EVALS<< "  # Neval"<<std::endl;
 
     for(int iev=0; iev<NUM_EVALS; iev++) {
 
