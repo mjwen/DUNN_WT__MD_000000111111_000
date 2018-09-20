@@ -39,7 +39,7 @@
 #include "descriptor.h"
 #include "helper.h"
 
-#define MAXLINE 2048
+#define MAXLINE 20480
 #define IGNORE_RESULT(fn) if(fn){}
 
 
@@ -544,9 +544,6 @@ int ANNImplementation::ProcessParameterFiles(
   Deallocate1DArray(stds);
 
 
-//TODO delete
-//  descriptor_->echo_input();
-
 
   // network structure
   // number of layers
@@ -676,10 +673,59 @@ int ANNImplementation::ProcessParameterFiles(
 
 
 
+
+
+
+//===================================================================
+  // read binary
+  getNextDataLine(parameterFilePointers[1], nextLine, MAXLINE, &endOfFileFlag);
+  int ensemble_size;
+  ier = sscanf(nextLine, "%d", &ensemble_size);
+  if (ier != 1) {
+    sprintf(errorMsg, "unable to read ensemble_size from line:\n");
+    strcat(errorMsg, nextLine);
+    ier = KIM_STATUS_FAIL;
+    pkim->report_error(__LINE__, __FILE__, errorMsg, ier);
+    fclose(parameterFilePointers[1]);
+    return ier;
+  }
+
+  network_->set_ensemble_size(ensemble_size);
+
+  for(int i=0; i<ensemble_size; i++) {
+    for(int j=0; j<numLayers; j++) {
+
+      int size;
+      if (j==0) {
+        size = numDescs;
+      } else {
+        size = numPerceptrons[j-1];
+      }
+
+      int* row_binary = new int[size];
+      getNextDataLine(parameterFilePointers[1], nextLine, MAXLINE, &endOfFileFlag);
+      ier = getXint(nextLine, size, row_binary);
+      if (ier != KIM_STATUS_OK) {
+        sprintf(errorMsg, "unable to read dropout binary from line:\n");
+        strcat(errorMsg, nextLine);
+        ier = KIM_STATUS_FAIL;
+        pkim->report_error(__LINE__, __FILE__, errorMsg, ier);
+        fclose(parameterFilePointers[1]);
+        return ier;
+      }
+      network_->add_dropout_binary(i, j, size, row_binary);
+      delete [] row_binary;
+    }
+  }
+
+
+
   delete [] numPerceptrons;
+
 
 //TODO delete
 //  network_->echo_input();
+
 
   // everything is good
   ier = KIM_STATUS_OK;

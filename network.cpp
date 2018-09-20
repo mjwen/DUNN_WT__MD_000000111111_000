@@ -2,7 +2,9 @@
 
 
 // Nothing to do at this moment
-NeuralNetwork::NeuralNetwork(){}
+NeuralNetwork::NeuralNetwork()
+: ensemble_size_(0)
+{}
 
 NeuralNetwork::~NeuralNetwork(){}
 
@@ -77,6 +79,29 @@ void NeuralNetwork::add_weight_bias(double** weight, double* bias, int layer)
   weights_[layer] = w;
   biases_[layer] = b;
 }
+
+void NeuralNetwork::set_ensemble_size(int repeat)
+{
+  ensemble_size_= repeat;
+  row_binary_.resize(repeat);
+  for (size_t i =0; i<row_binary_.size(); i++) {
+    row_binary_[i].resize(Nlayers_);
+  }
+}
+
+
+
+void NeuralNetwork::add_dropout_binary(int ensemble_index, int layer_index, int size, int* binary)
+{
+  RowMatrixXd data(1, size);
+  for (int i=0; i<size; i++){
+    data(0,i) = binary[i];
+  }
+  row_binary_[ensemble_index][layer_index] = data;
+}
+
+
+
 
 void NeuralNetwork::forward(double * zeta, const int rows, const int cols)
 {

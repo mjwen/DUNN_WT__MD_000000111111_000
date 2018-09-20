@@ -41,6 +41,9 @@ class NeuralNetwork
       return gradInput_.data();
     }
 
+  void set_ensemble_size(int repeat);
+  void add_dropout_binary(int ensemble_index, int layer_index, int size, int* binary);
+
 
 //TODO  for debug purpose delete
     void echo_input() {
@@ -59,6 +62,16 @@ class NeuralNetwork
         std::cout<<"w_"<<i<<std::endl<<weights_.at(i)<<std::endl;
         std::cout<<"b_"<<i<<std::endl<<biases_.at(i)<<std::endl;
       }
+
+      std::cout<<"==================================="<<std::endl;
+      std::cout<<"ensemble_size:"<<ensemble_size_<<std::endl;
+      for (size_t i=0; i<row_binary_.size(); i++) {
+        for (size_t j=0; j<row_binary_[i].size(); j++) {
+          std::cout<<"\n\n@@ i="<<i << " j="<<j<<" size="<<row_binary_[i][j].size() << std::endl;
+          std::cout<<row_binary_[i][j]<<std::endl;
+        }
+      }
+
     }
 
 
@@ -76,6 +89,9 @@ class NeuralNetwork
     std::vector<RowMatrixXd> keep_prob_binary_;
     RowMatrixXd activOutputLayer_;
     RowMatrixXd gradInput_;
+
+    int ensemble_size_;
+    std::vector<std::vector<RowMatrixXd>> row_binary_;
 
     // dropout
     RowMatrixXd dropout_(RowMatrixXd const& x, int layer);
