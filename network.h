@@ -26,7 +26,7 @@ class NeuralNetwork
     void set_activation(char* name);
     void set_keep_prob(double* keep_prob);
     void add_weight_bias(double** weight, double* bias, int layer);
-    void forward(double * zeta, const int rows, const int cols);
+    void forward(double * zeta, const int rows, const int cols, const int ensemble_index);
     void backward();
 
     double get_sum_output() {
@@ -42,6 +42,7 @@ class NeuralNetwork
     }
 
   void set_ensemble_size(int repeat);
+  int get_ensemble_size();
   void add_dropout_binary(int ensemble_index, int layer_index, int size, int* binary);
 
 
@@ -94,7 +95,7 @@ class NeuralNetwork
     std::vector<std::vector<RowMatrixXd>> row_binary_;
 
     // dropout
-    RowMatrixXd dropout_(RowMatrixXd const& x, int layer);
+    RowMatrixXd dropout_(RowMatrixXd const& x, int layer, int const ensemble_index);
 
 
 };

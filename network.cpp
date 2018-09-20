@@ -89,6 +89,10 @@ void NeuralNetwork::set_ensemble_size(int repeat)
   }
 }
 
+int NeuralNetwork::get_ensemble_size()
+{
+  return  ensemble_size_;
+}
 
 
 void NeuralNetwork::add_dropout_binary(int ensemble_index, int layer_index, int size, int* binary)
@@ -103,7 +107,7 @@ void NeuralNetwork::add_dropout_binary(int ensemble_index, int layer_index, int 
 
 
 
-void NeuralNetwork::forward(double * zeta, const int rows, const int cols)
+void NeuralNetwork::forward(double * zeta, const int rows, const int cols, int const ensemble_index)
 {
 
   RowMatrixXd act;
@@ -117,7 +121,7 @@ void NeuralNetwork::forward(double * zeta, const int rows, const int cols)
 
     // apply dropout
     if (keep_prob_[i] < 1-1e-10) {
-      act = dropout_(act, i);  // no aliasing will occur for act
+      act = dropout_(act, i, ensemble_index);  // no aliasing will occur for act
     }
 
     preactiv_[i] = (act * weights_[i]).rowwise() + biases_[i];
@@ -164,7 +168,7 @@ void NeuralNetwork::backward()
 
 
 // dropout
-RowMatrixXd NeuralNetwork::dropout_(RowMatrixXd const& x, int layer)
+RowMatrixXd NeuralNetwork::dropout_(RowMatrixXd const& x, int layer, int const ensemble_index)
 {
 
   RowMatrixXd y;
@@ -172,9 +176,11 @@ RowMatrixXd NeuralNetwork::dropout_(RowMatrixXd const& x, int layer)
 
   if (keep_prob < 1-1e-10) {
     // uniform [-1, 1]
-    RowMatrixXd random = RowMatrixXd::Random(1, x.cols());
+   // RowMatrixXd random = RowMatrixXd::Random(1, x.cols());
     // uniform [keep_prob, 1+keep_prob] .floor()
-    random =( (random/2.).array() + 0.5 + keep_prob ).floor();
+   // random =( (random/2.).array() + 0.5 + keep_prob ).floor();
+
+    RowMatrixXd random = row_binary_[ensemble_index][layer];
 
     keep_prob_binary_[layer] = random.replicate(x.rows(), 1);   // each row is the same (each atom is treated the same)
 

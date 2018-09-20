@@ -638,7 +638,7 @@ int ANNImplementation::Compute(
     AllocateAndInitialize2DArray(dEdGC_avg, Ncontrib, Ndescriptors);
 
     // do multiple runs to get the average
-    int NUM_EVALS = 50;
+    int NUM_EVALS = network_->get_ensemble_size();
     double** Epart_all;   // compute the standard deviation of atom energy
     AllocateAndInitialize2DArray(Epart_all, NUM_EVALS, Ncontrib);
 
@@ -665,7 +665,7 @@ int ANNImplementation::Compute(
     for(int iev=0; iev<NUM_EVALS; iev++) {
 
       // NN feedforward
-      network_->forward(GC[0], Ncontrib, Ndescriptors);
+      network_->forward(GC[0], Ncontrib, Ndescriptors, iev);
 
       if (isComputeEnergy == true) {
         double eng = network_->get_sum_output();
