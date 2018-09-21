@@ -361,6 +361,9 @@ int ANNImplementation::Compute(
   // requires less memory for GC and dGCdr, especially for dGCdr.
   //
 
+    double** single_forces;
+    AllocateAndInitialize2DArray(single_forces, Nparticles, 3);
+
   for (int i_lr=0; i_lr < nlayers_; i_lr++) {
 
     const std::vector<int> lr = layers_all_[i_lr];
@@ -374,8 +377,6 @@ int ANNImplementation::Compute(
     const int Ndescriptors = descriptor_->get_num_descriptors();
     AllocateAndInitialize2DArray(GC, Ncontrib, Ndescriptors);
     AllocateAndInitialize3DArray(dGCdr, Ncontrib, Ndescriptors, DIM*Nparticles);
-    double** single_forces;
-    AllocateAndInitialize2DArray(single_forces, Nparticles, 3);
 
 
     // calculate generalized coordiantes
@@ -703,22 +704,24 @@ int ANNImplementation::Compute(
           }
         }
 
-        for (int i=0; i<Nparticles; i++)
+        for (int i=0; i<cachedNumberOfParticles_; i++)
           for (int j=0; j<3; j++)
             single_forces[i][j] = 0.0;
 
         for (int i=0; i<Ncontrib; i++)
           for (int j=0; j<Ndescriptors; j++)
             for (int k=0; k<Nparticles; k++)
-              for (int kdim=0; kdim<DIM; kdim++)
+              for (int kdim=0; kdim<DIM; kdim++) {
                 single_forces[lr[k]][kdim] += dEdGC[i*Ndescriptors + j]  * dGCdr[i][j][k*DIM + kdim];
+
+              }
 
       }
 
 
       fp<<"# evaluation "<< iev <<std::endl;
       fp<<std::scientific;
-      for (int ip=0; ip<Nparticles; ip++) {
+      for (int ip=0; ip<cachedNumberOfParticles_; ip++) {
         fp << single_forces[ip][0] << " "<< single_forces[ip][1] << " "<< single_forces[ip][2] << std::endl;
       }
 
@@ -775,11 +778,11 @@ int ANNImplementation::Compute(
     Deallocate1DArray(Epart_avg);
     Deallocate2DArray(Epart_all);
     Deallocate2DArray(dEdGC_avg);
-    Deallocate2DArray(single_forces);
 
   }  // loop over i_lr
 
 
+    Deallocate2DArray(single_forces);
 
   // everything is good
   ier = KIM_STATUS_OK;
