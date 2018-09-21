@@ -39,7 +39,7 @@
 #include "descriptor.h"
 #include "helper.h"
 
-#define MAXLINE 2048
+#define MAXLINE 20480
 #define IGNORE_RESULT(fn) if(fn){}
 
 
