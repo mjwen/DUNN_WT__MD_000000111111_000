@@ -6,9 +6,7 @@
 //
 // You can obtain a copy of the license at
 // http://www.opensource.org/licenses/CDDL-1.0.  See the License for the
-// specific language governing permissions and limitations under the License.
-//
-// When distributing Covered Code, include this CDDL HEADER in each file and
+// specific language governing permissions and limitations under the License.  // // When distributing Covered Code, include this CDDL HEADER in each file and
 // include the License file in a prominent location with the name LICENSE.CDDL.
 // If applicable, add the following below this CDDL HEADER, with the fields
 // enclosed by brackets "[]" replaced with your own identifying information:
@@ -607,27 +605,65 @@ int ANNImplementation::Compute(
   AllocateAndInitialize2DArray(Epart_all, NUM_EVALS, Ncontrib);
 
 
+  //============================
+  static int step = 0;
+  int Nevery = 20;
+  //============================
+
+//  // read current step
+//  char buffer[256];
+//  std::ifstream fpr;
+//  fpr.open("current_step.txt", std::ios_base::in);
+//  fpr.getline (buffer, 100);
+//  fpr.close();
+//  int step;
+//  sscanf(buffer,"%d", &step);
+  bool do_write = false;
+  if (step%Nevery == 0) {
+    do_write = true;
+  }
+//  std::cout <<"@@hi" << buffer << std::endl;
+//  std::cout <<"@@step" << step << std::endl;
+//  std::cout <<"@@do_write" << do_write << std::endl;
+//
+//  // increase step and write out
+//  std::ofstream fpo;
+//  fpo.open("current_step.txt", std::ios_base::out);
+//  fpo<< step + 1<<std::endl;
+//  fpo.close();
 
 
+
+
+  // remove hi_coords.txt and hi_forces.txt
+  if (step == 0) {
+    std::remove("hi_coords.txt"); // delete file
+    std::remove("hi_forces.txt"); // delete file
+  }
 
 
   std::ofstream fp0;
+  std::ofstream fp;
+  if(do_write) {
   fp0.open("hi_coords.txt", std::ios_base::app);   // append mode
   fp0<<"#=========="<<std::endl;
+  fp0<<"# " <<step<< "  # step"<<std::endl;
   fp0<<"# " <<Nparticles<< "  # Nparticles"<<std::endl;
-  fp0<<std::scientific;
+  fp0<<std::scientific<<std::setprecision(15);
   for (int ip=0; ip<Nparticles; ip++) {
-    fp0 << coordinates[ip][0] << " "<< coordinates[ip][1] << " "<< coordinates[ip][2] << std::endl;
+    fp0  << coordinates[ip][0] << " "<< coordinates[ip][1] << " "<< coordinates[ip][2] << std::endl;
+  }
+
+
+  fp.open("hi_forces.txt", std::ios_base::app);   // append mode
+  fp<<"#=========="<<std::endl;
+  fp<<"# " <<step<< "  # step"<<std::endl;
+  fp<<"# " <<Nparticles<< "  # Nparticles"<<std::endl;
+  fp<<"# " <<NUM_EVALS<< "  # Neval"<<std::endl;
+
   }
   fp0.close();
 
-
-
-  std::ofstream fp;
-  fp.open("hi_forces.txt", std::ios_base::app);   // append mode
-  fp<<"#=========="<<std::endl;
-  fp<<"# " <<Nparticles<< "  # Nparticles"<<std::endl;
-  fp<<"# " <<NUM_EVALS<< "  # Neval"<<std::endl;
 
   for(int iev=0; iev<NUM_EVALS; iev++) {
 
@@ -680,13 +716,16 @@ int ANNImplementation::Compute(
     }
 
 
+  if(do_write) {
     fp<<"# evaluation "<< iev <<std::endl;
-    fp<<std::scientific;
+    fp<<std::scientific<<std::setprecision(15);
     for (int ip=0; ip<Nparticles; ip++) {
       fp << single_forces[ip][0] << " "<< single_forces[ip][1] << " "<< single_forces[ip][2] << std::endl;
     }
+  }
 
   }
+
   fp.close();
 
 
@@ -742,7 +781,8 @@ int ANNImplementation::Compute(
   Deallocate2DArray(single_forces);
 
 
-
+  // increate step
+  step += 1;
 
   // everything is good
   ier = KIM_STATUS_OK;
