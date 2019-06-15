@@ -390,8 +390,7 @@ int ANNImplementation::ProcessParameterFiles(
   for (int i = 0; i < numDescTypes; i++)
   {
     // descriptor name and parameter dimensions
-    getNextDataLine(
-        parameterFilePointers[0], nextLine, MAXLINE, &endOfFileFlag);
+    getNextDataLine(parameterFilePointers[0], nextLine, MAXLINE, &endOfFileFlag);
 
     // name of descriptor
     ier = sscanf(nextLine, "%s", name);
@@ -594,9 +593,14 @@ int ANNImplementation::ProcessParameterFiles(
   // TODO delete
   //  descriptor_->echo_input();
 
+
+//#############################################################################
+// model parameters
+//#############################################################################
+
   // network structure
   // number of layers
-  getNextDataLine(parameterFilePointers[0], nextLine, MAXLINE, &endOfFileFlag);
+  getNextDataLine(parameterFilePointers[1], nextLine, MAXLINE, &endOfFileFlag);
   ier = sscanf(nextLine, "%d", &numLayers);
   if (ier != 1)
   {
@@ -608,7 +612,7 @@ int ANNImplementation::ProcessParameterFiles(
 
   // number of perceptrons in each layer
   numPerceptrons = new int[numLayers];
-  getNextDataLine(parameterFilePointers[0], nextLine, MAXLINE, &endOfFileFlag);
+  getNextDataLine(parameterFilePointers[1], nextLine, MAXLINE, &endOfFileFlag);
   ier = getXint(nextLine, numLayers, numPerceptrons);
   if (ier)
   {
@@ -622,7 +626,7 @@ int ANNImplementation::ProcessParameterFiles(
   network_->set_nn_structure(numDescs, numLayers, numPerceptrons);
 
   // activation function
-  getNextDataLine(parameterFilePointers[0], nextLine, MAXLINE, &endOfFileFlag);
+  getNextDataLine(parameterFilePointers[1], nextLine, MAXLINE, &endOfFileFlag);
   ier = sscanf(nextLine, "%s", name);
   if (ier != 1)
   {
@@ -650,7 +654,7 @@ int ANNImplementation::ProcessParameterFiles(
   double * keep_prob;
   AllocateAndInitialize1DArray<double>(keep_prob, numLayers);
 
-  getNextDataLine(parameterFilePointers[0], nextLine, MAXLINE, &endOfFileFlag);
+  getNextDataLine(parameterFilePointers[1], nextLine, MAXLINE, &endOfFileFlag);
   ier = getXdouble(nextLine, numLayers, keep_prob);
   if (ier)
   {
@@ -685,7 +689,7 @@ int ANNImplementation::ProcessParameterFiles(
     for (int j = 0; j < row; j++)
     {
       getNextDataLine(
-          parameterFilePointers[0], nextLine, MAXLINE, &endOfFileFlag);
+          parameterFilePointers[1], nextLine, MAXLINE, &endOfFileFlag);
       ier = getXdouble(nextLine, col, weight[j]);
       if (ier)
       {
@@ -699,7 +703,7 @@ int ANNImplementation::ProcessParameterFiles(
     // bias
     AllocateAndInitialize1DArray<double>(bias, col);
     getNextDataLine(
-        parameterFilePointers[0], nextLine, MAXLINE, &endOfFileFlag);
+        parameterFilePointers[1], nextLine, MAXLINE, &endOfFileFlag);
     ier = getXdouble(nextLine, col, bias);
     if (ier)
     {
@@ -717,12 +721,14 @@ int ANNImplementation::ProcessParameterFiles(
   }
 
 
-  //===================================================================
-  // read binary
-  getNextDataLine(parameterFilePointers[1], nextLine, MAXLINE, &endOfFileFlag);
+//#############################################################################
+// read dropout binary
+//#############################################################################
+
+  getNextDataLine(parameterFilePointers[2], nextLine, MAXLINE, &endOfFileFlag);
   int ensemble_size;
   ier = sscanf(nextLine, "%d", &ensemble_size);
-  if (ier)
+  if (ier != 1)
   {
     sprintf(errorMsg, "unable to read ensemble_size from line:\n");
     strcat(errorMsg, nextLine);
@@ -745,7 +751,7 @@ int ANNImplementation::ProcessParameterFiles(
 
       int * row_binary = new int[size];
       getNextDataLine(
-          parameterFilePointers[1], nextLine, MAXLINE, &endOfFileFlag);
+          parameterFilePointers[2], nextLine, MAXLINE, &endOfFileFlag);
       ier = getXint(nextLine, size, row_binary);
       if (ier)
       {

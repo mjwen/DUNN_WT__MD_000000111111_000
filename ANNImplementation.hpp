@@ -39,7 +39,7 @@
 #define DIM 3
 #define ONE 1.0
 
-#define MAX_PARAMETER_FILES 2
+#define MAX_PARAMETER_FILES 3
 
 //==============================================================================
 //
