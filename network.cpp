@@ -1,21 +1,45 @@
+//
+// CDDL HEADER START
+//
+// The contents of this file are subject to the terms of the Common Development
+// and Distribution License Version 1.0 (the "License").
+//
+// You can obtain a copy of the license at
+// http://www.opensource.org/licenses/CDDL-1.0.  See the License for the
+// specific language governing permissions and limitations under the License.
+//
+// When distributing Covered Code, include this CDDL HEADER in each file and
+// include the License file in a prominent location with the name LICENSE.CDDL.
+// If applicable, add the following below this CDDL HEADER, with the fields
+// enclosed by brackets "[]" replaced with your own identifying information:
+//
+// Portions Copyright (c) [yyyy] [name of copyright owner]. All rights reserved.
+//
+// CDDL HEADER END
+//
+
+//
+// Copyright (c) 2019, Regents of the University of Minnesota.
+// All rights reserved.
+//
+// Contributors:
+//    Mingjian Wen
+//
+
 #include "network.h"
 
-
 // Nothing to do at this moment
-NeuralNetwork::NeuralNetwork()
-: ensemble_size_(0)
-{}
+NeuralNetwork::NeuralNetwork() : ensemble_size_(0) {}
 
-NeuralNetwork::~NeuralNetwork(){}
+NeuralNetwork::~NeuralNetwork() {}
 
-void NeuralNetwork::set_nn_structure(int size_input, int num_layers,
-    int* layer_sizes)
+void NeuralNetwork::set_nn_structure(int size_input,
+                                     int num_layers,
+                                     int * layer_sizes)
 {
   inputSize_ = size_input;
   Nlayers_ = num_layers;
-  for (int i=0; i<Nlayers_; i++) {
-    layerSizes_.push_back(layer_sizes[i]);
-  }
+  for (int i = 0; i < Nlayers_; i++) { layerSizes_.push_back(layer_sizes[i]); }
 
   weights_.resize(Nlayers_);
   biases_.resize(Nlayers_);
@@ -24,56 +48,59 @@ void NeuralNetwork::set_nn_structure(int size_input, int num_layers,
   keep_prob_binary_.resize(Nlayers_);
 }
 
-void NeuralNetwork::set_activation(char* name) {
-  if (strcmp(name, "sigmoid") == 0) {
+void NeuralNetwork::set_activation(char * name)
+{
+  if (strcmp(name, "sigmoid") == 0)
+  {
     activFunc_ = &sigmoid;
     activFuncDeriv_ = &sigmoid_derivative;
   }
-  else if (strcmp(name, "tanh") == 0) {
+  else if (strcmp(name, "tanh") == 0)
+  {
     activFunc_ = &tanh;
     activFuncDeriv_ = &tanh_derivative;
   }
-  else if (strcmp(name, "relu") == 0) {
+  else if (strcmp(name, "relu") == 0)
+  {
     activFunc_ = &relu;
     activFuncDeriv_ = &relu_derivative;
   }
-  else if (strcmp(name, "elu") == 0) {
+  else if (strcmp(name, "elu") == 0)
+  {
     activFunc_ = &elu;
     activFuncDeriv_ = &elu_derivative;
   }
 }
 
-void NeuralNetwork::set_keep_prob(double* keep_prob) {
-  for (int i=0; i<Nlayers_; i++) {
-    keep_prob_[i] = keep_prob[i];
-  }
+void NeuralNetwork::set_keep_prob(double * keep_prob)
+{
+  for (int i = 0; i < Nlayers_; i++) { keep_prob_[i] = keep_prob[i]; }
 }
 
-void NeuralNetwork::add_weight_bias(double** weight, double* bias, int layer)
+void NeuralNetwork::add_weight_bias(double ** weight, double * bias, int layer)
 {
   int rows;
   int cols;
 
-  if (layer == 0) {
+  if (layer == 0)
+  {
     rows = inputSize_;
     cols = layerSizes_[layer];
   }
-  else {
-    rows = layerSizes_[layer-1];
+  else
+  {
+    rows = layerSizes_[layer - 1];
     cols = layerSizes_[layer];
   }
 
   // copy data
   RowMatrixXd w(rows, cols);
   RowVectorXd b(cols);
-  for (int i=0; i<rows; i++) {
-    for (int j=0; j<cols; j++) {
-      w(i,j) = weight[i][j];
-    }
+  for (int i = 0; i < rows; i++)
+  {
+    for (int j = 0; j < cols; j++) { w(i, j) = weight[i][j]; }
   }
-  for (int j=0; j<cols; j++) {
-    b(j) = bias[j];
-  }
+  for (int j = 0; j < cols; j++) { b(j) = bias[j]; }
 
   // store in vector
   weights_[layer] = w;
@@ -82,34 +109,31 @@ void NeuralNetwork::add_weight_bias(double** weight, double* bias, int layer)
 
 void NeuralNetwork::set_ensemble_size(int repeat)
 {
-  ensemble_size_= repeat;
+  ensemble_size_ = repeat;
   row_binary_.resize(repeat);
-  for (size_t i =0; i<row_binary_.size(); i++) {
-    row_binary_[i].resize(Nlayers_);
-  }
+  for (size_t i = 0; i < row_binary_.size(); i++)
+  { row_binary_[i].resize(Nlayers_); }
 }
 
-int NeuralNetwork::get_ensemble_size()
-{
-  return  ensemble_size_;
-}
+int NeuralNetwork::get_ensemble_size() { return ensemble_size_; }
 
 
-void NeuralNetwork::add_dropout_binary(int ensemble_index, int layer_index, int size, int* binary)
+void NeuralNetwork::add_dropout_binary(int ensemble_index,
+                                       int layer_index,
+                                       int size,
+                                       int * binary)
 {
   RowMatrixXd data(1, size);
-  for (int i=0; i<size; i++){
-    data(0,i) = binary[i];
-  }
+  for (int i = 0; i < size; i++) { data(0, i) = binary[i]; }
   row_binary_[ensemble_index][layer_index] = data;
 }
 
 
-
-
-void NeuralNetwork::forward(double * zeta, const int rows, const int cols, int const ensemble_index)
+void NeuralNetwork::forward(double * zeta,
+                            const int rows,
+                            const int cols,
+                            int const ensemble_index)
 {
-
   RowMatrixXd act;
 
   // map raw C++ data into Matrix data
@@ -117,19 +141,22 @@ void NeuralNetwork::forward(double * zeta, const int rows, const int cols, int c
   Map<RowMatrixXd> activation(zeta, rows, cols);
   act = activation;
 
-  for (int i=0; i<Nlayers_; i++) {
-
+  for (int i = 0; i < Nlayers_; i++)
+  {
     // apply dropout
-    if (keep_prob_[i] < 1-1e-10) {
+    if (keep_prob_[i] < 1 - 1e-10)
+    {
       act = dropout_(act, i, ensemble_index);  // no aliasing will occur for act
     }
 
     preactiv_[i] = (act * weights_[i]).rowwise() + biases_[i];
 
-    if (i == Nlayers_ - 1) {  // output layer (no activation function applied)
+    if (i == Nlayers_ - 1)
+    {  // output layer (no activation function applied)
       activOutputLayer_ = preactiv_[i];
     }
-    else {
+    else
+    {
       act = activFunc_(preactiv_[i]);
     }
   }
@@ -137,68 +164,81 @@ void NeuralNetwork::forward(double * zeta, const int rows, const int cols, int c
 
 void NeuralNetwork::backward()
 {
-  // our cost (energy E) is the sum of activations at output layer, and no activation
-  // function is employed in the output layer
-  int rows = preactiv_[Nlayers_-1].rows();
-  int cols  = preactiv_[Nlayers_-1].cols();
+  // our cost (energy E) is the sum of activations at output layer, and no
+  // activation function is employed in the output layer
+  int rows = preactiv_[Nlayers_ - 1].rows();
+  int cols = preactiv_[Nlayers_ - 1].cols();
 
   // error at output layer
   RowMatrixXd delta = RowMatrixXd::Constant(rows, cols, 1.0);
 
-  for (int i = Nlayers_ - 2; i>=0; i--) {
+  for (int i = Nlayers_ - 2; i >= 0; i--)
+  {
     // eval() is used to prevent aliasing since delta is both lvalue and rvalue.
-    delta = ( delta * weights_[i+1].transpose() ).eval()
-        .cwiseProduct(activFuncDeriv_(preactiv_[i]));
+    delta = (delta * weights_[i + 1].transpose())
+      .eval()
+      .cwiseProduct(activFuncDeriv_(preactiv_[i]));
 
     // apply dropout
-    if (keep_prob_[i+1] < 1-1e-10) {
-      delta = delta.cwiseProduct(keep_prob_binary_[i+1]) / keep_prob_[i+1];  // no aliasing will occur
+    if (keep_prob_[i + 1] < 1 - 1e-10)
+    {
+      delta = delta.cwiseProduct(keep_prob_binary_[i + 1])
+        / keep_prob_[i + 1];  // no aliasing will occur
     }
   }
 
   // derivative of cost (energy E) w.r.t to input (generalized coords)
-  if (keep_prob_[0] < 1-1e-10) {
-    gradInput_ = (delta * weights_[0].transpose()).cwiseProduct(keep_prob_binary_[0])/keep_prob_[0];
+  if (keep_prob_[0] < 1 - 1e-10)
+  {
+    gradInput_
+      = (delta * weights_[0].transpose()).cwiseProduct(keep_prob_binary_[0])
+      / keep_prob_[0];
   }
-  else {
+  else
+  {
     gradInput_ = delta * weights_[0].transpose();
   }
-
 }
 
 
 // dropout
-RowMatrixXd NeuralNetwork::dropout_(RowMatrixXd const& x, int layer, int const ensemble_index)
+RowMatrixXd NeuralNetwork::dropout_(RowMatrixXd const & x,
+                                    int layer,
+                                    int const ensemble_index)
 {
-
   RowMatrixXd y;
   double keep_prob = keep_prob_[layer];
 
-  if (keep_prob < 1-1e-10) {
+  if (keep_prob < 1 - 1e-10)
+  {
     // uniform [-1, 1]
-   // RowMatrixXd random = RowMatrixXd::Random(1, x.cols());
+    // RowMatrixXd random = RowMatrixXd::Random(1, x.cols());
     // uniform [keep_prob, 1+keep_prob] .floor()
-   // random =( (random/2.).array() + 0.5 + keep_prob ).floor();
+    // random =( (random/2.).array() + 0.5 + keep_prob ).floor();
 
     RowMatrixXd random = row_binary_[ensemble_index][layer];
 
-    keep_prob_binary_[layer] = random.replicate(x.rows(), 1);   // each row is the same (each atom is treated the same)
+    keep_prob_binary_[layer] = random.replicate(
+        x.rows(), 1);  // each row is the same (each atom is treated the same)
 
-    //TODO delete  This is for debug pourpose, should be used together with `openkim-fit/tests/test_ann_force_dropout.py`
+    // TODO delete  This is for debug pourpose, should be used together with
+    // `openkim-fit/tests/test_ann_force_dropout.py`
     bool debug = false;
-    if (debug) {
+    if (debug)
+    {
       keep_prob_binary_[layer] = RowMatrixXd::Ones(x.rows(), x.cols());
-      keep_prob_binary_[layer](0,0) = 0.;
-      keep_prob_binary_[layer](0,5) = 0.;
-      keep_prob_binary_[layer](1,2) = 0.;
-      keep_prob_binary_[layer](1,7) = 0.;
-      keep_prob_binary_[layer](2,2) = 0.;
-      keep_prob_binary_[layer](2,5) = 0.;
+      keep_prob_binary_[layer](0, 0) = 0.;
+      keep_prob_binary_[layer](0, 5) = 0.;
+      keep_prob_binary_[layer](1, 2) = 0.;
+      keep_prob_binary_[layer](1, 7) = 0.;
+      keep_prob_binary_[layer](2, 2) = 0.;
+      keep_prob_binary_[layer](2, 5) = 0.;
     }
 
-    y = (x/keep_prob).cwiseProduct(keep_prob_binary_[layer]);
+    y = (x / keep_prob).cwiseProduct(keep_prob_binary_[layer]);
   }
-  else {
+  else
+  {
     y = x;
   }
 
@@ -210,81 +250,79 @@ RowMatrixXd NeuralNetwork::dropout_(RowMatrixXd const& x, int layer, int const e
 // activation functions and derivatives
 //*****************************************************************************
 
-RowMatrixXd relu(RowMatrixXd const& x)
-{
-  return x.cwiseMax(0.0);
-}
+RowMatrixXd relu(RowMatrixXd const & x) { return x.cwiseMax(0.0); }
 
-RowMatrixXd relu_derivative(RowMatrixXd const& x)
+RowMatrixXd relu_derivative(RowMatrixXd const & x)
 {
-//TODO Eigenic way should exist
   RowMatrixXd deriv(x.rows(), x.cols());
-  for (int i=0; i<x.rows(); i++) {
-    for (int j=0; j<x.cols(); j++) {
-      if (x(i,j) < 0.) {
-        deriv(i,j) = 0.;
-      } else {
-        deriv(i,j) = 1.;
+
+  for (int i = 0; i < x.rows(); i++)
+  {
+    for (int j = 0; j < x.cols(); j++)
+    {
+      if (x(i, j) < 0.) { deriv(i, j) = 0.; }
+      else
+      {
+        deriv(i, j) = 1.;
       }
     }
   }
   return deriv;
 }
 
-RowMatrixXd elu(RowMatrixXd const& x)
+RowMatrixXd elu(RowMatrixXd const & x)
 {
-  //TODO Eigenic way should exist
   double alpha = 1.0;
   RowMatrixXd e(x.rows(), x.cols());
-  for (int i=0; i<x.rows(); i++) {
-    for (int j=0; j<x.cols(); j++) {
-      if (x(i,j) < 0.) {
-        e(i,j) = alpha*(exp(x(i,j))-1);
-      } else {
-        e(i,j) = x(i,j);
+
+  for (int i = 0; i < x.rows(); i++)
+  {
+    for (int j = 0; j < x.cols(); j++)
+    {
+      if (x(i, j) < 0.) { e(i, j) = alpha * (exp(x(i, j)) - 1); }
+      else
+      {
+        e(i, j) = x(i, j);
       }
     }
   }
   return e;
 }
 
-RowMatrixXd elu_derivative(RowMatrixXd const& x)
+RowMatrixXd elu_derivative(RowMatrixXd const & x)
 {
-  //TODO Eigenic way should exist
   double alpha = 1.0;
   RowMatrixXd deriv(x.rows(), x.cols());
-  for (int i=0; i<x.rows(); i++) {
-    for (int j=0; j<x.cols(); j++) {
-      if (x(i,j) < 0.) {
-        deriv(i,j) = alpha*exp(x(i,j));
-      } else {
-        deriv(i,j) = 1.;
+
+  for (int i = 0; i < x.rows(); i++)
+  {
+    for (int j = 0; j < x.cols(); j++)
+    {
+      if (x(i, j) < 0.) { deriv(i, j) = alpha * exp(x(i, j)); }
+      else
+      {
+        deriv(i, j) = 1.;
       }
     }
   }
   return deriv;
 }
 
-RowMatrixXd tanh(RowMatrixXd const& x)
-{
-  return (x.array().tanh()).matrix();
-}
+RowMatrixXd tanh(RowMatrixXd const & x) { return (x.array().tanh()).matrix(); }
 
-RowMatrixXd tanh_derivative(RowMatrixXd const& x)
+RowMatrixXd tanh_derivative(RowMatrixXd const & x)
 {
   return (1.0 - x.array().tanh().square()).matrix();
 }
 
-RowMatrixXd sigmoid(RowMatrixXd const& x)
+RowMatrixXd sigmoid(RowMatrixXd const & x)
 {
-  return (1.0 / ( 1.0 + (-x).array().exp() )).matrix();
+  return (1.0 / (1.0 + (-x).array().exp())).matrix();
 }
 
-RowMatrixXd sigmoid_derivative(RowMatrixXd const& x)
+RowMatrixXd sigmoid_derivative(RowMatrixXd const & x)
 {
   RowMatrixXd s = sigmoid(x);
-  return ( s.array() * (1.0 - s.array()) ).matrix();
+
+  return (s.array() * (1.0 - s.array())).matrix();
 }
-
-
-

@@ -1,5 +1,5 @@
 *.o
-*bkp
 *.so
 *.a
-ANNImplementationComputeDispatch.cpp
+build/
+eigen-v3.3.7/

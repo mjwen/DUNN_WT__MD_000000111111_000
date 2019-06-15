@@ -6,7 +6,9 @@
 //
 // You can obtain a copy of the license at
 // http://www.opensource.org/licenses/CDDL-1.0.  See the License for the
-// specific language governing permissions and limitations under the License.  // // When distributing Covered Code, include this CDDL HEADER in each file and
+// specific language governing permissions and limitations under the License.
+//
+// When distributing Covered Code, include this CDDL HEADER in each file and
 // include the License file in a prominent location with the name LICENSE.CDDL.
 // If applicable, add the following below this CDDL HEADER, with the fields
 // enclosed by brackets "[]" replaced with your own identifying information:
@@ -17,105 +19,27 @@
 //
 
 //
-// Copyright (c) 2015, Regents of the University of Minnesota.
+// Copyright (c) 2019, Regents of the University of Minnesota.
 // All rights reserved.
 //
 // Contributors:
 //    Mingjian Wen
 //
 
-
 #ifndef ANN_IMPLEMENTATION_HPP_
 #define ANN_IMPLEMENTATION_HPP_
 
-#include <iomanip>
-#include "KIM_API_status.h"
 #include "ANN.hpp"
+#include "KIM_LogMacros.hpp"
 #include "descriptor.h"
+#include "helper.hpp"
 #include "network.h"
-#include "helper.h"
+#include <vector>
 
 #define DIM 3
 #define ONE 1.0
-#define HALF 0.5
 
 #define MAX_PARAMETER_FILES 2
-
-
-//==============================================================================
-//
-// Type definitions, and helper function prototypes
-//
-//==============================================================================
-
-// type declaration for get neighbor functions
-typedef int (GetNeighborFunction)(void**, int*, int*, int*, int*, int**,
-                                  double**);
-// type declaration for vector of constant dimension
-typedef double VectorOfSizeDIM[DIM];
-
-
-//==============================================================================
-//
-// Helper class definitions
-//
-//==============================================================================
-
-// Iterator object for Locator mode access to neighbor list
-class LocatorIterator
-{
- private:
-  KIM_API_model* const pkim_;
-  GetNeighborFunction* const get_neigh_;
-  int const baseconvert_;
-  int const cachedNumberContributingParticles_;
-  int request_;
-  int const mode_;
- public:
-  LocatorIterator(KIM_API_model* const pkim,
-                  GetNeighborFunction* const get_neigh,
-                  int const baseconvert,
-                  int const cachedNumberContributingParticles,
-                  int* const i,
-                  int* const numnei,
-                  int** const n1atom,
-                  double** const pRij)
-      : pkim_(pkim),
-        get_neigh_(get_neigh),
-        baseconvert_(baseconvert),
-        cachedNumberContributingParticles_(cachedNumberContributingParticles),
-        request_(-baseconvert_),  // set to first value (test-based indexing)
-    mode_(1)  // locator mode
-  {
-    next(i, numnei, n1atom, pRij);
-  }
-  bool done() const
-  {
-    return !(request_ + baseconvert_ <= cachedNumberContributingParticles_);
-  }
-  int next(int* const i, int* const numnei, int** const n1atom,
-           double** const pRij)
-  {
-    int ier;
-    // Allow for request_ to be incremented to one more than contributing
-    // without causing an error/warning from the openkim-api
-    int req = std::min(request_,
-                       cachedNumberContributingParticles_-baseconvert_-1);
-    ier = (*get_neigh_)(
-        reinterpret_cast<void**>(const_cast<KIM_API_model**>(&pkim_)),
-        (int*) &mode_,
-        &req,
-        (int*) i,
-        (int*) numnei,
-        (int**) n1atom,
-        (double**) pRij);
-    *i += baseconvert_;  // adjust index of current particle
-
-    ++request_;
-    return ier;
-  }
-};
-
 
 //==============================================================================
 //
@@ -127,162 +51,182 @@ class LocatorIterator
 class ANNImplementation
 {
  public:
-  ANNImplementation(
-      KIM_API_model* const pkim,
-      char const* const parameterFileNames,
-      int const parameterFileNameLength,
-      int const numberParameterFiles,
-      int* const ier);
+  ANNImplementation(KIM::ModelDriverCreate * const modelDriverCreate,
+                    KIM::LengthUnit const requestedLengthUnit,
+                    KIM::EnergyUnit const requestedEnergyUnit,
+                    KIM::ChargeUnit const requestedChargeUnit,
+                    KIM::TemperatureUnit const requestedTemperatureUnit,
+                    KIM::TimeUnit const requestedTimeUnit,
+                    int * const ier);
   ~ANNImplementation();  // no explicit Destroy() needed here
 
-  int Reinit(KIM_API_model* pkim);
-  int Compute(KIM_API_model* pkim);
+  int Refresh(KIM::ModelRefresh * const modelRefresh);
+  int Compute(KIM::ModelCompute const * const modelCompute,
+              KIM::ModelComputeArguments const * const modelComputeArguments);
+  int ComputeArgumentsCreate(KIM::ModelComputeArgumentsCreate * const
+                                 modelComputeArgumentsCreate) const;
+  int ComputeArgumentsDestroy(KIM::ModelComputeArgumentsDestroy * const
+                                  modelComputeArgumentsDestroy) const;
 
  private:
   // Constant values that never change
   //   Set in constructor (via SetConstantValues)
   //
   //
-  // KIM API: Conventions
-  int baseconvert_;
-
-	//
   // ANNImplementation: constants
-  int numberOfSpeciesIndex_;
-  int numberOfParticlesIndex_;
-  int particleSpeciesIndex_;
-  int particleStatusIndex_;
-  int coordinatesIndex_;
-  int get_neighIndex_;
-  int process_dEdrIndex_;
-  int process_d2Edr2Index_;
-  //
-  // KIM API: Model Output indices
-  int cutoffIndex_;
-  int energyIndex_;
-  int forcesIndex_;
-  int particleEnergyIndex_;
-  //
-  // LennardJones612Implementation: constants
   int numberModelSpecies_;
+  std::vector<int> modelSpeciesCodeList_;
   int numberUniqueSpeciesPairs_;
-
-
 
   // Constant values that are read from the input files and never change
   //   Set in constructor (via functions listed below)
   //
   //
-  // KIM API: Model Fixed Parameters
-  //   Memory allocated in   AllocateFixedParameterMemory()
+  // Private Model Parameters
+  //   Memory allocated in AllocatePrivateParameterMemory() (from constructor)
   //   Memory deallocated in destructor
   //   Data set in ReadParameterFile routines
   // none
   //
-  // KIM API: Model Free Parameters whose (pointer) values never change
-  //   Memory allocated in   AllocateFreeParameterMemory() (from constructor)
+  // KIM API: Model Parameters whose (pointer) values never change
+  //   Memory allocated in AllocateParameterMemory() (from constructor)
   //   Memory deallocated in destructor
   //   Data set in ReadParameterFile routines OR by KIM Simulator
-  double* cutoffs_;
-  double* cutoffs_samelayer_;
+  double * cutoff_;
+  double ** cutoffSq_2D_;
 
-  // Mutable values that only change when reinit() executes
-  //   Set in Reinit (via SetReinitMutableValues)
+  // Mutable values that only change when Refresh() executes
+  //   Set in Refresh (via SetRefreshMutableValues)
   //
   //
-  // KIM API: Model Fixed Parameters
+  // KIM API: Model Parameters (can be changed directly by KIM Simulator)
   // none
   //
-  // KIM API: Model Free Parameters
-  // none
-  //
-  // ANNImplementation: values
-  double** cutoffsSq2D_;
-  double** cutoffsSq2D_samelayer_;
+  // ANNImplementation: values (changed only by Refresh())
+  double influenceDistance_;
+  int modelWillNotRequestNeighborsOfNoncontributingParticles_;
 
-  // Mutable values that can change with each call to Reinit() and Compute()
+  // Mutable values that can change with each call to Refresh() and Compute()
   //   Memory may be reallocated on each call
   //
   //
   // ANNImplementation: values that change
   int cachedNumberOfParticles_;
-  int cachedNumberContributingParticles_;
 
-	// descriptor;
-	Descriptor* descriptor_;
-	NeuralNetwork* network_;
+  // descriptor;
+  Descriptor * descriptor_;
+  NeuralNetwork * network_;
 
-
-  // configurations of last computation
-  int numberOfParticles_last_call_;
-  std::vector<int> particleSpecies_last_call_;
-  std::vector<double> coordinates_last_call_;
-
-	// Helper methods
+  // Helper methods
   //
   //
   // Related to constructor
-  int SetConstantValues(KIM_API_model* const pkim);
-  void AllocateFreeParameterMemory();
-  static int OpenParameterFiles(
-      KIM_API_model* const pkim,
-      char const* const parameterFileNames,
-      int const parameterFileNameLength,
-      int const numberParameterFiles,
-      FILE* parameterFilePointers[MAX_PARAMETER_FILES]);
-  static void CloseParameterFiles(
-      FILE* const parameterFilePointers[MAX_PARAMETER_FILES],
-      int const numberParameterFiles);
+  void AllocatePrivateParameterMemory();
+  void AllocateParameterMemory();
+
+  static int
+  OpenParameterFiles(KIM::ModelDriverCreate * const modelDriverCreate,
+                     int const numberParameterFiles,
+                     FILE * parameterFilePointers[MAX_PARAMETER_FILES]);
   int ProcessParameterFiles(
-      KIM_API_model* const pkim,
-      FILE* const parameterFilePointers[MAX_PARAMETER_FILES],
-      int const numberParameterFiles);
-  void getNextDataLine(FILE* const filePtr, char* const nextLine,
-                       int const maxSize, int* endOfFileFlag);
-  int getXdouble(char* linePtr, const int N, double* list);
-  int getXint(char* linePtr, const int N, int* list);
-  void lowerCase(char* linePtr);
-  int ConvertUnits(KIM_API_model* const pkim);
-  int RegisterKIMParameters(KIM_API_model* const pkim) const;
-  int RegisterKIMFunctions(KIM_API_model* const pkim) const;
+      KIM::ModelDriverCreate * const modelDriverCreate,
+      int const numberParameterFiles,
+      FILE * const parameterFilePointers[MAX_PARAMETER_FILES]);
+  void getNextDataLine(FILE * const filePtr,
+                       char * const nextLine,
+                       int const maxSize,
+                       int * endOfFileFlag);
+  int getXdouble(char * linePtr, const int N, double * list);
+  int getXint(char * linePtr, const int N, int * list);
+  void lowerCase(char * linePtr);
+  static void
+  CloseParameterFiles(int const numberParameterFiles,
+                      FILE * const parameterFilePointers[MAX_PARAMETER_FILES]);
+  int ConvertUnits(KIM::ModelDriverCreate * const modelDriverCreate,
+                   KIM::LengthUnit const requestedLengthUnit,
+                   KIM::EnergyUnit const requestedEnergyUnit,
+                   KIM::ChargeUnit const requestedChargeUnit,
+                   KIM::TemperatureUnit const requestedTemperatureUnit,
+                   KIM::TimeUnit const requestedTimeUnit);
+  int RegisterKIMModelSettings(
+      KIM::ModelDriverCreate * const modelDriverCreate) const;
+  int RegisterKIMComputeArgumentsSettings(
+      KIM::ModelComputeArgumentsCreate * const modelComputeArgumentsCreate)
+      const;
+  int RegisterKIMParameters(KIM::ModelDriverCreate * const modelDriverCreate);
+  int RegisterKIMFunctions(
+      KIM::ModelDriverCreate * const modelDriverCreate) const;
+
   //
-  // Related to Reinit()
-  int SetReinitMutableValues(KIM_API_model* const pkim);
+  // Related to Refresh()
+  template<class ModelObj>
+  int SetRefreshMutableValues(ModelObj * const modelObj);
+
   //
   // Related to Compute()
-  int SetComputeMutableValues(KIM_API_model* const pkim,
-                              bool& isComputeProcess_dEdr,
-                              bool& isComputeProcess_d2Edr2,
-                              bool& isComputeEnergy,
-                              bool& isComputeForces,
-                              bool& isComputeParticleEnergy,
-                              int const*& particleSpecies,
-                              GetNeighborFunction *& get_neigh,
-                              VectorOfSizeDIM const*& coordinates,
-                              double*& energy,
-                              double*& particleEnergy,
-                              VectorOfSizeDIM*& forces);
-  int CheckParticleSpecies(KIM_API_model* const pkim,
-                           int const* const particleSpecies) const;
-  int GetComputeIndex(const bool& isComputeProcess_dEdr,
-                      const bool& isComputeProcess_d2Edr2,
-                      const bool& isComputeEnergy,
-                      const bool& isComputeForces,
-                      const bool& isComputeParticleEnergy) const;
+  int SetComputeMutableValues(
+      KIM::ModelComputeArguments const * const modelComputeArguments,
+      bool & isComputeProcess_dEdr,
+      bool & isComputeProcess_d2Edr2,
+      bool & isComputeEnergy,
+      bool & isComputeForces,
+      bool & isComputeParticleEnergy,
+      bool & isComputeVirial,
+      bool & isComputeParticleVirial,
+      int const *& particleSpeciesCodes,
+      int const *& particleContributing,
+      VectorOfSizeDIM const *& coordinates,
+      double *& energy,
+      VectorOfSizeDIM *& forces,
+      double *& particleEnergy,
+      VectorOfSizeSix *& virial,
+      VectorOfSizeSix *& particleViral);
+  int CheckParticleSpeciesCodes(KIM::ModelCompute const * const modelCompute,
+                                int const * const particleSpeciesCodes) const;
+  int GetComputeIndex(const bool & isComputeProcess_dEdr,
+                      const bool & isComputeProcess_d2Edr2,
+                      const bool & isComputeEnergy,
+                      const bool & isComputeForces,
+                      const bool & isComputeParticleEnergy,
+                      const bool & isComputeVirial,
+                      const bool & isComputeParticleVirial) const;
 
   // compute functions
-  template< class Iter,
-            bool isComputeProcess_dEdr, bool isComputeProcess_d2Edr2,
-            bool isComputeEnergy, bool isComputeForces,
-            bool isComputeParticleEnergy>
-  int Compute(KIM_API_model* const pkim,
-              const int* const particleSpecies,
-              GetNeighborFunction* const get_neigh,
-              const VectorOfSizeDIM* const coordinates,
-              double* const energy,
-              VectorOfSizeDIM* const forces,
-              double* const particleEnergy);
+  template<bool isComputeProcess_dEdr,
+           bool isComputeProcess_d2Edr2,
+           bool isComputeEnergy,
+           bool isComputeForces,
+           bool isComputeParticleEnergy,
+           bool isComputeVirial,
+           bool isComputeParticleVirial>
+  int Compute(KIM::ModelCompute const * const modelCompute,
+              KIM::ModelComputeArguments const * const modelComputeArguments,
+              const int * const particleSpeciesCodes,
+              const int * const particleContributing,
+              const VectorOfSizeDIM * const coordinates,
+              double * const energy,
+              VectorOfSizeDIM * const forces,
+              double * const particleEnergy,
+              VectorOfSizeSix virial,
+              VectorOfSizeSix * const particleVirial) const;
 
+  // LJ functions
+  void calc_phi(double const epsilon,
+                double const sigma,
+                double const cutoff,
+                double const r,
+                double * const phi) const;
+  void calc_phi_dphi(double const epsilon,
+                     double const sigma,
+                     double const cutoff,
+                     double const r,
+                     double * const phi,
+                     double * const dphi) const;
+  void switch_fn(double const x_min,
+                 double const x_max,
+                 double const x,
+                 double * const fn,
+                 double * const fn_prime) const;
 };
 
 //==============================================================================
@@ -295,497 +239,378 @@ class ANNImplementation
 //
 //==============================================================================
 
-template< class Iter,
-          bool isComputeProcess_dEdr, bool isComputeProcess_d2Edr2,
-          bool isComputeEnergy, bool isComputeForces,
-          bool isComputeParticleEnergy>
+#undef KIM_LOGGER_OBJECT_NAME
+#define KIM_LOGGER_OBJECT_NAME modelCompute
+template<bool isComputeProcess_dEdr,
+         bool isComputeProcess_d2Edr2,
+         bool isComputeEnergy,
+         bool isComputeForces,
+         bool isComputeParticleEnergy,
+         bool isComputeVirial,
+         bool isComputeParticleVirial>
 int ANNImplementation::Compute(
-    KIM_API_model* const pkim,
-    const int* const particleSpecies,
-    GetNeighborFunction* const get_neigh,
-    const VectorOfSizeDIM* const coordinates,
-    double* const energy,
-    VectorOfSizeDIM* const forces,
-    double* const particleEnergy)
+    KIM::ModelCompute const * const modelCompute,
+    KIM::ModelComputeArguments const * const modelComputeArguments,
+    const int * const particleSpeciesCodes,
+    const int * const particleContributing,
+    const VectorOfSizeDIM * const coordinates,
+    double * const energy,
+    VectorOfSizeDIM * const forces,
+    double * const particleEnergy,
+    VectorOfSizeSix virial,
+    VectorOfSizeSix * const particleVirial) const
 {
+  int ier = false;
 
-  bool need_forces = (isComputeProcess_dEdr == true) || (isComputeForces == true);
+  if ((isComputeEnergy == false) && (isComputeParticleEnergy == false)
+      && (isComputeForces == false) && (isComputeProcess_dEdr == false)
+      && (isComputeProcess_d2Edr2 == false) && (isComputeVirial == false)
+      && (isComputeParticleVirial == false))
+  { return ier; }
 
-  int ier = KIM_STATUS_OK;
 
-  if ((isComputeEnergy == false) &&
-      (isComputeParticleEnergy == false) &&
-      (isComputeForces == false) &&
-      (isComputeProcess_dEdr == false) &&
-      (isComputeProcess_d2Edr2 == false))
-    return ier;
+  if (isComputeProcess_dEdr == true)
+  {
+    LOG_ERROR("process_dEdr not supported by this driver");
+    return true;
+  }
+
+  if (isComputeProcess_d2Edr2 == true)
+  {
+    LOG_ERROR("process_d2Edr2 not supported by this driver");
+    return true;
+  }
+
+  bool need_dE = ((isComputeForces == true) || (isComputeVirial == true) ||
+      (isComputeParticleVirial == true));
+
+
+  // ANNImplementation: values that does not change
+  int const Nparticles = cachedNumberOfParticles_;
 
   // initialize energy and forces
-	const int Nparticles = cachedNumberOfParticles_;
-	const int Ncontrib = cachedNumberContributingParticles_;
-  if (isComputeEnergy == true) {
-    *energy = 0.0;
+  if (isComputeEnergy == true) { *energy = 0.0; }
+
+  if (isComputeParticleEnergy == true)
+  {
+    for (int i = 0; i < Nparticles; ++i) { particleEnergy[i] = 0.0; }
   }
-  if (isComputeParticleEnergy == true) {
-    for (int i = 0; i < Nparticles; ++i) {
-      particleEnergy[i] = 0.0;
+
+  if (isComputeForces == true)
+  {
+    for (int i = 0; i < Nparticles; ++i)
+    {
+      for (int j = 0; j < DIM; ++j) { forces[i][j] = 0.0; }
     }
   }
-  if (isComputeForces == true) {
-    for (int i = 0; i < Nparticles; ++i) {
-      for (int j = 0; j < DIM; ++j)
-        forces[i][j] = 0.0;
+
+  if (isComputeVirial == true)
+  {
+    for (int i = 0; i < 6; ++i) { virial[i] = 0.0; }
+  }
+
+  if (isComputeParticleVirial == true)
+  {
+    for (int i = 0; i < Nparticles; ++i)
+    {
+      for (int j = 0; j < 6; ++j) { particleVirial[i][j] = 0.0; }
     }
   }
 
 
-
-  // setting up generalzied coords matrix and the its derivative w.r.t. atomic coords
-  double** GC;
-  double*** dGCdr;
-  const int Ndescriptors = descriptor_->get_num_descriptors();
-  AllocateAndInitialize2DArray(GC, Ncontrib, Ndescriptors);
-  AllocateAndInitialize3DArray(dGCdr, Ncontrib, Ndescriptors, DIM*Nparticles);
-  double** single_forces;
-  AllocateAndInitialize2DArray(single_forces, Nparticles, 3);
-
-
-  // calculate generalized coordiantes
+  // calculate generalized coordinates
   //
   // Setup loop over contributing particles
-  for (int ii=0; ii<Ncontrib; ii++) {
-
-    int i = ii;
-    int const iSpecies = particleSpecies[i];
+  for (int i = 0; i < Nparticles; i++)
+  {
+    if (!particleContributing[i]) { continue; }
 
     // get neighbors of atom i
-    int one = 1;
-    int dummy;
     int numnei = 0;
-    int* n1atom = 0;
-    double* pRij = 0;
-    int const baseConvert = baseconvert_;
-    int request = i - baseConvert;
-    get_neigh( reinterpret_cast<void**>(const_cast<KIM_API_model**>(&pkim)),
-        &one, &request, &dummy, &numnei, &n1atom, &pRij);
+    int const * n1atom = 0;
+    modelComputeArguments->GetNeighborList(0, i, &numnei, &n1atom);
+    int const iSpecies = particleSpeciesCodes[i];
 
-    int const numNei = numnei;
-    int const * const n1Atom = n1atom;
+
+    double * GC;
+    double ** dGCdr;
+    int const Ndescriptors = descriptor_->get_num_descriptors();
+    AllocateAndInitialize1DArray<double>(GC, Ndescriptors);
+    AllocateAndInitialize2DArray<double>(dGCdr, Ndescriptors, (numnei+1)*DIM);
+
 
     // Setup loop over neighbors of current particle
-    for (int jj = 0; jj < numNei; ++jj)
+    for (int jj = 0; jj < numnei; ++jj)
     {
       // adjust index of particle neighbor
-      int const j = n1Atom[jj] + baseConvert;
-      int const jSpecies = particleSpecies[j];
+      int const j = n1atom[jj];
+      int const jSpecies = particleSpeciesCodes[j];
 
       // cutoff between ij
-      double rcutij = sqrt(cutoffsSq2D_[iSpecies][jSpecies]);
+      double rcutij = sqrt(cutoffSq_2D_[iSpecies][jSpecies]);
 
       // Compute rij
       double rij[DIM];
-      for (int dim = 0; dim < DIM; ++dim) {
-        rij[dim] = coordinates[j][dim] - coordinates[i][dim];
-      }
-      double const rijmag = sqrt(rij[0]*rij[0] + rij[1]*rij[1] + rij[2]*rij[2]);
+      for (int dim = 0; dim < DIM; ++dim)
+      { rij[dim] = coordinates[j][dim] - coordinates[i][dim]; }
+      double const rijsq = rij[0] * rij[0] + rij[1] * rij[1] + rij[2] * rij[2];
+      double const rijmag = sqrt(rijsq);
+
 
       // if particles i and j not interact
-      if (rijmag > rcutij) continue;
+      if (rijmag > rcutij) { continue; }
 
-      // Note, this part can be packed into a function as Behler 2001
-      // Then we can support other descriptors
-      // two-body descriptors
-      for (size_t p=0; p<descriptor_->name.size(); p++) {
-
-        if (descriptor_->name[p] != "g1" &&
-            descriptor_->name[p] != "g2" &&
-            descriptor_->name[p] != "g3") {
-          continue;
-        }
+      for (size_t p = 0; p < descriptor_->name.size(); p++)
+      {
+        if (descriptor_->name[p] != "g1" && descriptor_->name[p] != "g2"
+            && descriptor_->name[p] != "g3")
+        { continue; }
         int idx = descriptor_->starting_index[p];
 
-        for(int q=0; q<descriptor_->num_param_sets[p]; q++) {
-
+        for (int q = 0; q < descriptor_->num_param_sets[p]; q++)
+        {
           double gc;
           double dgcdr_two;
-          if (descriptor_->name[p] == "g1") {
-            if (need_forces) {
-              descriptor_->sym_d_g1(rijmag, rcutij, gc, dgcdr_two);
-            } else {
+          if (descriptor_->name[p] == "g1")
+          {
+            if (need_dE)
+            { descriptor_->sym_d_g1(rijmag, rcutij, gc, dgcdr_two); }
+            else
+            {
               descriptor_->sym_g1(rijmag, rcutij, gc);
             }
           }
-          else if (descriptor_->name[p] == "g2") {
+          else if (descriptor_->name[p] == "g2")
+          {
             double eta = descriptor_->params[p][q][0];
             double Rs = descriptor_->params[p][q][1];
-            if (need_forces) {
-              descriptor_->sym_d_g2(eta, Rs, rijmag, rcutij, gc, dgcdr_two);
-            } else {
+            if (need_dE)
+            { descriptor_->sym_d_g2(eta, Rs, rijmag, rcutij, gc, dgcdr_two); }
+            else
+            {
               descriptor_->sym_g2(eta, Rs, rijmag, rcutij, gc);
             }
           }
-          else if (descriptor_->name[p] == "g3") {
+          else if (descriptor_->name[p] == "g3")
+          {
             double kappa = descriptor_->params[p][q][0];
-            if (need_forces) {
-              descriptor_->sym_d_g3(kappa, rijmag, rcutij, gc, dgcdr_two);
-            } else {
+            if (need_dE)
+            { descriptor_->sym_d_g3(kappa, rijmag, rcutij, gc, dgcdr_two); }
+            else
+            {
               descriptor_->sym_g3(kappa, rijmag, rcutij, gc);
             }
           }
 
-          GC[ii][idx] += gc;
-          if (need_forces) {
-            for (int kdim = 0; kdim < DIM; ++kdim) {
-              double pair = dgcdr_two*rij[kdim]/rijmag;
-              dGCdr[ii][idx][i*DIM+kdim] += pair;
-              dGCdr[ii][idx][j*DIM+kdim] -= pair;
+          GC[idx] += gc;
+          if (need_dE)
+          {
+            for (int dim = 0; dim < DIM; ++dim)
+            {
+              double pair = dgcdr_two * rij[dim] / rijmag;
+              dGCdr[idx][numnei * DIM + dim] += pair;
+              dGCdr[idx][jj * DIM + dim] -= pair;
             }
           }
           idx += 1;
 
-        } // loop over same descriptor but different parameter set
-      } // loop over descriptors
+        }  // loop over same descriptor but different parameter set
+      }  // loop over descriptors
+
 
       // three-body descriptors
       if (descriptor_->has_three_body == false) continue;
 
-      for (int kk = jj+1; kk < numNei; ++kk) {
-
+      for (int kk = jj + 1; kk < numnei; ++kk)
+      {
         // adjust index of particle neighbor
-        int const k = n1Atom[kk] + baseConvert;
-        int const kSpecies = particleSpecies[k];
+        int const k = n1atom[kk];
+        int const kSpecies = particleSpeciesCodes[k];
 
         // cutoff between ik and jk
-        double const rcutij = sqrt(cutoffsSq2D_samelayer_[iSpecies][jSpecies]);
-        double const rcutik = sqrt(cutoffsSq2D_samelayer_[iSpecies][kSpecies]);
-        double const rcutjk = sqrt(cutoffsSq2D_samelayer_[jSpecies][kSpecies]);
+        double const rcutik = sqrt(cutoffSq_2D_[iSpecies][kSpecies]);
+        double const rcutjk = sqrt(cutoffSq_2D_[jSpecies][kSpecies]);
 
         // Compute rik, rjk and their squares
         double rik[DIM];
         double rjk[DIM];
-        for (int dim = 0; dim < DIM; ++dim) {
+        for (int dim = 0; dim < DIM; ++dim)
+        {
           rik[dim] = coordinates[k][dim] - coordinates[i][dim];
           rjk[dim] = coordinates[k][dim] - coordinates[j][dim];
         }
-        double const rikmag = sqrt(rik[0]*rik[0] + rik[1]*rik[1] + rik[2]*rik[2]);
-        double const rjkmag = sqrt(rjk[0]*rjk[0] + rjk[1]*rjk[1] + rjk[2]*rjk[2]);
+        double const riksq
+            = rik[0] * rik[0] + rik[1] * rik[1] + rik[2] * rik[2];
+        double const rjksq
+            = rjk[0] * rjk[0] + rjk[1] * rjk[1] + rjk[2] * rjk[2];
+        double const rikmag = sqrt(riksq);
+        double const rjkmag = sqrt(rjksq);
 
         double const rvec[3] = {rijmag, rikmag, rjkmag};
         double const rcutvec[3] = {rcutij, rcutik, rcutjk};
 
-        if (rikmag > rcutik) continue; // three-dody not interacting
+        if (rikmag > rcutik) continue;  // three-dody not interacting
 
-        for (size_t p=0; p<descriptor_->name.size(); p++) {
-
-          if (descriptor_->name[p] != "g4" &&
-              descriptor_->name[p] != "g5") {
-            continue;
-          }
+        for (size_t p = 0; p < descriptor_->name.size(); p++)
+        {
+          if (descriptor_->name[p] != "g4" && descriptor_->name[p] != "g5")
+          { continue; }
           int idx = descriptor_->starting_index[p];
 
-          for(int q=0; q<descriptor_->num_param_sets[p]; q++) {
-
+          for (int q = 0; q < descriptor_->num_param_sets[p]; q++)
+          {
             double gc;
             double dgcdr_three[3];
-            if (descriptor_->name[p] == "g4") {
+            if (descriptor_->name[p] == "g4")
+            {
               double zeta = descriptor_->params[p][q][0];
               double lambda = descriptor_->params[p][q][1];
               double eta = descriptor_->params[p][q][2];
-              if (need_forces) {
-                descriptor_->sym_d_g4(zeta, lambda, eta, rvec, rcutvec, gc, dgcdr_three);
-              } else {
+
+              if (need_dE)
+              {
+                descriptor_->sym_d_g4(
+                    zeta, lambda, eta, rvec, rcutvec, gc, dgcdr_three);
+              }
+              else
+              {
                 descriptor_->sym_g4(zeta, lambda, eta, rvec, rcutvec, gc);
               }
             }
-            else if (descriptor_->name[p] == "g5") {
+            else if (descriptor_->name[p] == "g5")
+            {
               double zeta = descriptor_->params[p][q][0];
               double lambda = descriptor_->params[p][q][1];
               double eta = descriptor_->params[p][q][2];
-              if (need_forces) {
-                descriptor_->sym_d_g5(zeta, lambda, eta, rvec, rcutvec, gc, dgcdr_three);
-              } else {
+              if (need_dE)
+              {
+                descriptor_->sym_d_g5(
+                    zeta, lambda, eta, rvec, rcutvec, gc, dgcdr_three);
+              }
+              else
+              {
                 descriptor_->sym_g5(zeta, lambda, eta, rvec, rcutvec, gc);
               }
             }
 
-            GC[ii][idx] += gc;
+            GC[idx] += gc;
 
-            if (need_forces) {
-              for (int kdim = 0; kdim < DIM; ++kdim) {
-                double pair_ij = dgcdr_three[0]*rij[kdim]/rijmag;
-                double pair_ik = dgcdr_three[1]*rik[kdim]/rikmag;
-                double pair_jk = dgcdr_three[2]*rjk[kdim]/rjkmag;
-                dGCdr[ii][idx][i*DIM+kdim] += pair_ij + pair_ik;
-                dGCdr[ii][idx][j*DIM+kdim] += -pair_ij + pair_jk;
-                dGCdr[ii][idx][k*DIM+kdim] += -pair_ik - pair_jk;
+            if (need_dE)
+            {
+              for (int dim = 0; dim < DIM; ++dim)
+              {
+                double pair_ij = dgcdr_three[0] * rij[dim] / rijmag;
+                double pair_ik = dgcdr_three[1] * rik[dim] / rikmag;
+                double pair_jk = dgcdr_three[2] * rjk[dim] / rjkmag;
+                dGCdr[idx][numnei * DIM + dim] += pair_ij + pair_ik;
+                dGCdr[idx][jj * DIM + dim] += -pair_ij + pair_jk;
+                dGCdr[idx][kk * DIM + dim] += -pair_ik - pair_jk;
               }
             }
             idx += 1;
 
-          } // loop over same descriptor but different parameter set
+          }  // loop over same descriptor but different parameter set
         }  // loop over descriptors
-      }  // loop over kk (three body neighbors)
-    }  // end of first neighbor loop
-  }  // end of loop over contributing particles
+      }  // loop over kk
+
+    }  // loop over jj
 
 
-  /*
-  //TODO delete debug (print generalized coords not_normalized)
-  std::cout<<"# Debug descriptor values before normalization" << std::endl;
-  std::cout<<"# atom id    descriptor values ..." << std::endl;
-  for(int i=0; i<Ncontrib; i++) {
-  std::cout<< lr_con[i] <<"    ";
-  for(int j=0; j<Ndescriptors; j++) {
-  printf("%.15f ",GC[i][j]);
-  }
-  std::cout<<std::endl;
-  }
-   */
-
-  /*
-     std::cout<<"# Debug dGCdr before normalization" << std::endl;
-     std::cout<<"# atom id  desc id  dGCdr descriptor values ..." << std::endl;
-     for(int i=0; i<Ncontrib; i++) {
-     for(int j=0; j<Ndescriptors; j++) {
-     std::cout<< lr_con[i] <<"    " <<j<<"    " ;
-     for(int k=0; k<DIM*Nparticles; k++) {
-     printf("%.15f ",dGCdr[i][j][k]);
-     }
-     std::cout<<std::endl;
-     }
-     }
-   */
-
-
-  // centering and normalization
-  if (descriptor_->center_and_normalize) {
-    for (int i=0; i<Ncontrib; i++) {
-      for (int j=0; j<Ndescriptors; j++) {
-
-        GC[i][j] = (GC[i][j] - descriptor_->features_mean[j]) / descriptor_->features_std[j];
-
-        if (need_forces) {
-          for (int k=0; k<DIM*Nparticles; k++) {
-            dGCdr[i][j][k] /= descriptor_->features_std[j];
-          }
-        }
-
+    // centering and normalization
+    if (descriptor_->center_and_normalize)
+    {
+      for (int t = 0; t < Ndescriptors; t++)
+      {
+        GC[t] = (GC[t] - descriptor_->features_mean[t])
+                / descriptor_->features_std[t];
       }
-    }
-  }
 
+      // Done below when computing forces
+      //      if (need_dE)
+      //      {
+      //        for (int s = 0; s < Npairs_two; s++)
+      //        {
+      //          for (int t = 0; t < Ndescriptors_two; t++)
+      //          {
+      //            int desc_idx = map_t_desc_two[t];
+      //            dGCdr_two[s][t] /= descriptor_->features_std[desc_idx];
+      //          }
+      //        }
 
-  /*
-  //TODO delete debug (print generalized coords normalized)
-  std::cout<<"\n\n# Debug descriptor values after normalization" << std::endl;
-  std::cout<<"# atom id    descriptor values ..." << std::endl;
-  for(int i=0; i<Ncontrib; i++)
-  {
-  std::cout<< lr_con[i] <<"    ";
-  for(int j=0; j<Ndescriptors; j++) {
-  printf("%.15f ",GC[i][j]);
-  }
-  std::cout<<std::endl;
-  }
-   */
-
-
-  double E_avg;
-  double* Epart_avg;
-  double** dEdGC_avg;
-  std::vector<double> E_all;
-
-  E_avg = 0;
-  AllocateAndInitialize1DArray(Epart_avg, Ncontrib);
-  AllocateAndInitialize2DArray(dEdGC_avg, Ncontrib, Ndescriptors);
-
-  // do multiple runs to get the average
-  int NUM_EVALS = network_->get_ensemble_size();
-  double** Epart_all;   // compute the standard deviation of atom energy
-  AllocateAndInitialize2DArray(Epart_all, NUM_EVALS, Ncontrib);
-
-
-  //============================
-  static int step = 0;
-  int Nevery = 20;
-  //============================
-
-//  // read current step
-//  char buffer[256];
-//  std::ifstream fpr;
-//  fpr.open("current_step.txt", std::ios_base::in);
-//  fpr.getline (buffer, 100);
-//  fpr.close();
-//  int step;
-//  sscanf(buffer,"%d", &step);
-  bool do_write = false;
-  if (step%Nevery == 0) {
-    do_write = true;
-  }
-//  std::cout <<"@@hi" << buffer << std::endl;
-//  std::cout <<"@@step" << step << std::endl;
-//  std::cout <<"@@do_write" << do_write << std::endl;
-//
-//  // increase step and write out
-//  std::ofstream fpo;
-//  fpo.open("current_step.txt", std::ios_base::out);
-//  fpo<< step + 1<<std::endl;
-//  fpo.close();
-
-
-
-
-  // remove hi_coords.txt and hi_forces.txt
-  if (step == 0) {
-    std::remove("hi_coords.txt"); // delete file
-    std::remove("hi_forces.txt"); // delete file
-  }
-
-
-  std::ofstream fp0;
-  std::ofstream fp;
-  if(do_write) {
-  fp0.open("hi_coords.txt", std::ios_base::app);   // append mode
-  fp0<<"#=========="<<std::endl;
-  fp0<<"# " <<step<< "  # step"<<std::endl;
-  fp0<<"# " <<Nparticles<< "  # Nparticles"<<std::endl;
-  fp0<<std::scientific<<std::setprecision(15);
-  for (int ip=0; ip<Nparticles; ip++) {
-    fp0  << coordinates[ip][0] << " "<< coordinates[ip][1] << " "<< coordinates[ip][2] << std::endl;
-  }
-
-
-  fp.open("hi_forces.txt", std::ios_base::app);   // append mode
-  fp<<"#=========="<<std::endl;
-  fp<<"# " <<step<< "  # step"<<std::endl;
-  fp<<"# " <<Nparticles<< "  # Nparticles"<<std::endl;
-  fp<<"# " <<NUM_EVALS<< "  # Neval"<<std::endl;
-
-  }
-  fp0.close();
-
-
-  for(int iev=0; iev<NUM_EVALS; iev++) {
-
-    // NN feedforward
-    network_->forward(GC[0], Ncontrib, Ndescriptors, iev);
-
-    if (isComputeEnergy == true) {
-      double eng = network_->get_sum_output();
-      E_avg += eng / NUM_EVALS;
-      E_all.push_back(eng);
-    }
-
-    /*      if (isComputeParticleEnergy == true) {
-            double* Epart;
-            Epart = network_->get_output();
-            for (int i=0; i<Ncontrib; i++) {
-            Epart_avg[i] += Epart[i] / NUM_EVALS;
-            }
-            }
-     */
-    // all partilce energy
-    double* Epart;
-    Epart = network_->get_output();
-    for (int i=0; i<Ncontrib; i++) {
-      Epart_all[iev][i] = Epart[i];
+      //        for (int s = 0; s < Npairs_three; s++)
+      //        {
+      //          for (int t = 0; t < Ndescriptors_three; t++)
+      //          {
+      //            int desc_idx = map_t_desc_three[t];
+      //            dGCdr_three[s][t][0] /= descriptor_->features_std[desc_idx];
+      //            dGCdr_three[s][t][1] /= descriptor_->features_std[desc_idx];
+      //            dGCdr_three[s][t][2] /= descriptor_->features_std[desc_idx];
+      //          }
+      //        }
+      //      }
     }
 
 
-    if (need_forces) {
-      // NN backpropagation to compute derivative of energy w.r.t generalized coords
+    // NN feed forward
+    int ensemble_index = 0;
+    network_->forward(GC, 1, Ndescriptors, ensemble_index);
+
+    // NN backprop to compute derivative of energy w.r.t generalized coords
+    double * dEdGC = NULL;
+    if (need_dE)
+    {
       network_->backward();
-      double* dEdGC;
       dEdGC = network_->get_grad_input();
-      for (int i=0; i<Ncontrib; i++) {
-        for (int j=0; j<Ndescriptors; j++) {
-          dEdGC_avg[i][j] += dEdGC[i*Ndescriptors + j] / NUM_EVALS;
+    }
+
+    double Ei = 0.;
+    if (isComputeEnergy == true || isComputeParticleEnergy == true)
+    { Ei = network_->get_sum_output(); }
+
+    // Contribution to energy
+    if (isComputeEnergy == true) { *energy += Ei; }
+
+    // Contribution to particle energy
+    if (isComputeParticleEnergy == true) { particleEnergy[i] += Ei; }
+
+    // Contribution to forces
+    if (isComputeForces == true) {
+      // atom i itself
+      for (int j = 0; j < Ndescriptors; j++) {
+        for (int k = 0; k < numnei+1; k++) {
+          int idx ;
+          if (k==numnei) {
+            idx = i;  // targeting atom itself
+          }
+          else {
+            idx = n1atom[k]; // neighbors
+          }
+          for (int dim = 0; dim < DIM; dim++) {
+            forces[idx][dim] += dEdGC[j] * dGCdr[j][k * DIM + dim];
+          }
         }
       }
+    }
 
-      for (int i=0; i<Nparticles; i++)
-        for (int j=0; j<3; j++)
-          single_forces[i][j] = 0.0;
+    // Contribution to virial
+    if (isComputeVirial == true) {
+      //TODO
+    }
 
-      for (int i=0; i<Ncontrib; i++)
-        for (int j=0; j<Ndescriptors; j++)
-          for (int k=0; k<Nparticles; k++)
-            for (int kdim=0; kdim<DIM; kdim++)
-              single_forces[k][kdim] += dEdGC[i*Ndescriptors + j]  * dGCdr[i][j][k*DIM + kdim];
-
+    // Contribution to particleVirial
+    if (isComputeParticleVirial == true) {
+      //TODO
     }
 
 
-  if(do_write) {
-    fp<<"# evaluation "<< iev <<std::endl;
-    fp<<std::scientific<<std::setprecision(15);
-    for (int ip=0; ip<Nparticles; ip++) {
-      fp << single_forces[ip][0] << " "<< single_forces[ip][1] << " "<< single_forces[ip][2] << std::endl;
-    }
-  }
+    Deallocate1DArray(GC);
+    Deallocate2DArray(dGCdr);
 
-  }
+  }  // loop over i
 
-  fp.close();
-
-
-  // compute mean and stdev of energy
-  double mean;
-  double stdev;
-  ComputeMeanAndStdev(E_all, mean, stdev);
-
-  //    std::ofstream fp;
-  //    fp.open("energy_mean_stdev.txt", std::ios_base::app);   // append mode
-  //    fp << std::setprecision(16) << mean<< "    " <<stdev <<std::endl;
-
-  // write std per atom
-  /*    std::ofstream fp2;
-        fp2.open("energy_atom.txt", std::ios_base::app);   // append mode
-        for(int iev=0; iev<NUM_EVALS; iev++) {
-        for (int i=0; i<Ncontrib; i++) {
-        fp2 << std::setprecision(16) <<Epart_all[iev][i]<< "  ";
-        }
-        fp2 << std::endl;
-        }
-   */
-
-  // Contribution to energy
-  if (isComputeEnergy == true) {
-    *energy += E_avg;
-  }
-
-  // Contribution to particle energy
-  if (isComputeParticleEnergy == true) {
-    for (int i=0; i<Ncontrib; i++) {
-      particleEnergy[i] += Epart_avg[i];
-    }
-  }
-
-  // Compute derivative of energy w.r.t coords
-  if (need_forces) {
-    for (int i=0; i<Ncontrib; i++)
-      for (int j=0; j<Ndescriptors; j++)
-        for (int k=0; k<Nparticles; k++)
-          for (int kdim=0; kdim<DIM; kdim++) {
-            forces[k][kdim] += dEdGC_avg[i][j] * dGCdr[i][j][k*DIM + kdim];
-          }
-  }
-
-
-  // dealloate local array
-  Deallocate2DArray(GC);
-  Deallocate3DArray(dGCdr);
-  Deallocate1DArray(Epart_avg);
-  Deallocate2DArray(Epart_all);
-  Deallocate2DArray(dEdGC_avg);
-  Deallocate2DArray(single_forces);
-
-
-  // increate step
-  step += 1;
 
   // everything is good
-  ier = KIM_STATUS_OK;
+  ier = false;
   return ier;
 }
 

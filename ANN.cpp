@@ -19,13 +19,12 @@
 //
 
 //
-// Copyright (c) 2015, Regents of the University of Minnesota.
+// Copyright (c) 2019, Regents of the University of Minnesota.
 // All rights reserved.
 //
 // Contributors:
-//    Mingjian
+//    Mingjian Wen
 //
-
 
 #include <cmath>
 #include <cstdlib>
@@ -35,7 +34,6 @@
 
 #include "ANN.hpp"
 #include "ANNImplementation.hpp"
-#include "KIM_API_status.h"
 
 //==============================================================================
 //
@@ -44,18 +42,27 @@
 //==============================================================================
 
 //******************************************************************************
-int model_driver_init(void* km, char* paramfile_names, int* nmstrlen,
-                      int* numparamfiles)
+extern "C" {
+int model_driver_create(KIM::ModelDriverCreate * const modelDriverCreate,
+                        KIM::LengthUnit const requestedLengthUnit,
+                        KIM::EnergyUnit const requestedEnergyUnit,
+                        KIM::ChargeUnit const requestedChargeUnit,
+                        KIM::TemperatureUnit const requestedTemperatureUnit,
+                        KIM::TimeUnit const requestedTimeUnit)
 {
-  KIM_API_model* const pkim = *static_cast<KIM_API_model**>(km);
   int ier;
 
   // read input files, convert units if needed, compute
   // interpolation coefficients, set cutoff, and publish parameters
-  ANN* const modelObject
-      = new ANN(pkim, paramfile_names, *nmstrlen,
-                            *numparamfiles, &ier);
-  if (ier < KIM_STATUS_OK)
+  ANN * const modelObject = new ANN(modelDriverCreate,
+                                    requestedLengthUnit,
+                                    requestedEnergyUnit,
+                                    requestedChargeUnit,
+                                    requestedTemperatureUnit,
+                                    requestedTimeUnit,
+                                    &ier);
+
+  if (ier)
   {
     // constructor already reported the error
     delete modelObject;
@@ -63,17 +70,12 @@ int model_driver_init(void* km, char* paramfile_names, int* nmstrlen,
   }
 
   // register pointer to ANN object in KIM object
-  pkim->set_model_buffer(static_cast<void*>(modelObject), &ier);
-  if (ier < KIM_STATUS_OK)
-  {
-    pkim->report_error(__LINE__, __FILE__, "set_model_buffer", ier);
-    delete modelObject;
-    return ier;
-  }
+  modelDriverCreate->SetModelBufferPointer(static_cast<void *>(modelObject));
 
   // everything is good
-  ier = KIM_STATUS_OK;
+  ier = false;
   return ier;
+}
 }
 
 //==============================================================================
@@ -83,82 +85,92 @@ int model_driver_init(void* km, char* paramfile_names, int* nmstrlen,
 //==============================================================================
 
 //******************************************************************************
-ANN::ANN(
-    KIM_API_model* const pkim,
-    char const* const parameterFileNames,
-    int const parameterFileNameLength,
-    int const numberParameterFiles,
-    int* const ier)
+ANN::ANN(KIM::ModelDriverCreate * const modelDriverCreate,
+         KIM::LengthUnit const requestedLengthUnit,
+         KIM::EnergyUnit const requestedEnergyUnit,
+         KIM::ChargeUnit const requestedChargeUnit,
+         KIM::TemperatureUnit const requestedTemperatureUnit,
+         KIM::TimeUnit const requestedTimeUnit,
+         int * const ier)
 {
-  implementation_ = new ANNImplementation(
-      pkim,
-      parameterFileNames,
-      parameterFileNameLength,
-      numberParameterFiles,
-      ier);
+  implementation_ = new ANNImplementation(modelDriverCreate,
+                                          requestedLengthUnit,
+                                          requestedEnergyUnit,
+                                          requestedChargeUnit,
+                                          requestedTemperatureUnit,
+                                          requestedTimeUnit,
+                                          ier);
 }
 
 //******************************************************************************
-ANN::~ANN()
-{
-  delete implementation_;
-}
+ANN::~ANN() { delete implementation_; }
 
 //******************************************************************************
-int ANN::Destroy(void* kimmdl)  // static member function
+// static member function
+int ANN::Destroy(KIM::ModelDestroy * const modelDestroy)
 {
-  KIM_API_model* const pkim = *static_cast<KIM_API_model**>(kimmdl);
-  int ier;
-  ANN* const modelObject
-      = (ANN*) pkim->get_model_buffer(&ier);
-  if (ier < KIM_STATUS_OK)
-  {
-    pkim->report_error(__LINE__, __FILE__, "get_model_buffer", ier);
-    return ier;
-  }
+  ANN * modelObject;
+
+  modelDestroy->GetModelBufferPointer(reinterpret_cast<void **>(&modelObject));
 
   if (modelObject != NULL)
   {
     // delete object itself
     delete modelObject;
-
-    // nullify model buffer
-    pkim->set_model_buffer(NULL, &ier);
   }
 
   // everything is good
-  ier = KIM_STATUS_OK;
-  return ier;
+  return false;
 }
 
 //******************************************************************************
-int ANN::Reinit(void* kimmdl)  // static member function
+// static member function
+int ANN::Refresh(KIM::ModelRefresh * const modelRefresh)
 {
-  KIM_API_model* const pkim = *static_cast<KIM_API_model**>(kimmdl);
-  int ier;
-  ANN* const modelObject
-      = (ANN*) pkim->get_model_buffer(&ier);
-  if (ier < KIM_STATUS_OK)
-  {
-    pkim->report_error(__LINE__, __FILE__, "get_model_buffer", ier);
-    return ier;
-  }
+  ANN * modelObject;
 
-  return modelObject->implementation_->Reinit(pkim);
+  modelRefresh->GetModelBufferPointer(reinterpret_cast<void **>(&modelObject));
+
+  return modelObject->implementation_->Refresh(modelRefresh);
 }
 
 //******************************************************************************
-int ANN::Compute(void* kimmdl)  // static member function
+// static member function
+int ANN::Compute(KIM::ModelCompute const * const modelCompute,
+                 KIM::ModelComputeArguments const * const modelComputeArguments)
 {
-  KIM_API_model* const pkim = *static_cast<KIM_API_model**>(kimmdl);
-  int ier;
-  ANN* const modelObject
-      = static_cast<ANN*>(pkim->get_model_buffer(&ier));
-  if (ier < KIM_STATUS_OK)
-  {
-    pkim->report_error(__LINE__, __FILE__, "get_model_buffer", ier);
-    return ier;
-  }
+  ANN * modelObject;
 
-  return modelObject->implementation_->Compute(pkim);
+  modelCompute->GetModelBufferPointer(reinterpret_cast<void **>(&modelObject));
+
+  return modelObject->implementation_->Compute(modelCompute,
+                                               modelComputeArguments);
+}
+
+//******************************************************************************
+// static member function
+int ANN::ComputeArgumentsCreate(
+    KIM::ModelCompute const * const modelCompute,
+    KIM::ModelComputeArgumentsCreate * const modelComputeArgumentsCreate)
+{
+  ANN * modelObject;
+
+  modelCompute->GetModelBufferPointer(reinterpret_cast<void **>(&modelObject));
+
+  return modelObject->implementation_->ComputeArgumentsCreate(
+      modelComputeArgumentsCreate);
+}
+
+//******************************************************************************
+// static member function
+int ANN::ComputeArgumentsDestroy(
+    KIM::ModelCompute const * const modelCompute,
+    KIM::ModelComputeArgumentsDestroy * const modelComputeArgumentsDestroy)
+{
+  ANN * modelObject;
+
+  modelCompute->GetModelBufferPointer(reinterpret_cast<void **>(&modelObject));
+
+  return modelObject->implementation_->ComputeArgumentsDestroy(
+      modelComputeArgumentsDestroy);
 }
