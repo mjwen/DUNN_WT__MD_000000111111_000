@@ -32,14 +32,26 @@
 #include <cmath>
 #include <cstddef>
 #include <vector>
+#include <algorithm>
+#include <iostream>
+#include <iterator>
+#include <numeric>
+#include <string>
+#include <cstring>
+
 
 // typedefs
 typedef double VectorOfSizeDIM[3];
 typedef double VectorOfSizeSix[6];
 
 
-// 1D Array
 //******************************************************************************
+// Allocating memory
+//******************************************************************************
+
+//********************
+// 1D Array
+//********************
 template<class T>
 void AllocateAndInitialize1DArray(T *& arrayPtr, int const extent)
 {
@@ -58,9 +70,9 @@ void Deallocate1DArray(T *& arrayPtr)
 }
 
 
+//********************
 // 2D Array
-//******************************************************************************
-// allocate memory and set pointers
+//********************
 template<class T>
 void AllocateAndInitialize2DArray(T **& arrayPtr,
                                   int const extentZero,
@@ -91,9 +103,9 @@ void Deallocate2DArray(T **& arrayPtr)
 }
 
 
+//********************
 // 3D Array
-//******************************************************************************
-// allocate memory and set pointers
+//********************
 template<class T>
 void AllocateAndInitialize3DArray(T ***& arrayPtr,
                                   int const extentZero,
@@ -143,6 +155,7 @@ void Deallocate3DArray(T ***& arrayPtr)
 }
 
 
+//******************************************************************************
 // process virial
 //******************************************************************************
 void ProcessVirialTerm(double const dEidr,
@@ -162,3 +175,24 @@ void ComputeMeanAndStdev(std::vector<double> const & data,
                          double & stdev);
 
 #endif
+
+
+
+//******************************************************************************
+// process parameter file
+//******************************************************************************
+void getNextDataLine(FILE * const filePtr, char * const nextLine,
+    int const maxSize, int * endOfFileFlag);
+
+int getXdouble(char * linePtr, const int N, double * list);
+int getXint(char * linePtr, const int N, int * list);
+void lowerCase(char * linePtr);
+
+
+//******************************************************************************
+// others
+//******************************************************************************
+
+// compute the mean and standard deviation of vector
+void ComputeMeanAndStdev(std::vector<double> const & v, double & mean, double & stdev);
+

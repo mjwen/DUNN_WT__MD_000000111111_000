@@ -132,13 +132,6 @@ class ANNImplementation
       KIM::ModelDriverCreate * const modelDriverCreate,
       int const numberParameterFiles,
       FILE * const parameterFilePointers[MAX_PARAMETER_FILES]);
-  void getNextDataLine(FILE * const filePtr,
-                       char * const nextLine,
-                       int const maxSize,
-                       int * endOfFileFlag);
-  int getXdouble(char * linePtr, const int N, double * list);
-  int getXint(char * linePtr, const int N, int * list);
-  void lowerCase(char * linePtr);
   static void
   CloseParameterFiles(int const numberParameterFiles,
                       FILE * const parameterFilePointers[MAX_PARAMETER_FILES]);

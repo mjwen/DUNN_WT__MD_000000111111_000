@@ -333,6 +333,10 @@ int ANNImplementation::ProcessParameterFiles(
   int * numPerceptrons;
 
 
+  //#######################
+  // descriptor info
+  //#######################
+
   //TODO modify  should readin from file
   index = 0;
   strcpy(spec, "C");
@@ -594,9 +598,9 @@ int ANNImplementation::ProcessParameterFiles(
   //  descriptor_->echo_input();
 
 
-//#############################################################################
-// model parameters
-//#############################################################################
+  //#######################
+  // model parameters
+  //#######################
 
   // network structure
   // number of layers
@@ -721,9 +725,9 @@ int ANNImplementation::ProcessParameterFiles(
   }
 
 
-//#############################################################################
-// read dropout binary
-//#############################################################################
+  //#######################
+  // read dropout binary
+  //#######################
 
   getNextDataLine(parameterFilePointers[2], nextLine, MAXLINE, &endOfFileFlag);
   int ensemble_size;
@@ -772,82 +776,6 @@ int ANNImplementation::ProcessParameterFiles(
   // everything is good
   ier = false;
   return ier;
-}
-
-
-//******************************************************************************
-void ANNImplementation::getNextDataLine(FILE * const filePtr,
-                                        char * nextLinePtr,
-                                        int const maxSize,
-                                        int * endOfFileFlag)
-{
-  do
-  {
-    if (fgets(nextLinePtr, maxSize, filePtr) == NULL)
-    {
-      *endOfFileFlag = 1;
-      break;
-    }
-
-    while ((nextLinePtr[0] == ' ' || nextLinePtr[0] == '\t')
-           || (nextLinePtr[0] == '\n' || nextLinePtr[0] == '\r'))
-    { nextLinePtr = (nextLinePtr + 1); }
-  } while ((strncmp("#", nextLinePtr, 1) == 0) || (strlen(nextLinePtr) == 0));
-
-  // remove comments starting with `#' in a line
-  char * pch = strchr(nextLinePtr, '#');
-  if (pch != NULL) { *pch = '\0'; }
-}
-
-//******************************************************************************
-int ANNImplementation::getXdouble(char * linePtr, const int N, double * list)
-{
-  int ier;
-  char * pch;
-  char line[MAXLINE];
-  int i = 0;
-
-  strcpy(line, linePtr);
-  pch = strtok(line, " \t\n\r");
-  while (pch != NULL)
-  {
-    ier = sscanf(pch, "%lf", &list[i]);
-    if (ier != 1) { return true; }
-    pch = strtok(NULL, " \t\n\r");
-    i += 1;
-  }
-
-  if (i != N) { return true; }
-
-  return false;
-}
-
-//******************************************************************************
-int ANNImplementation::getXint(char * linePtr, const int N, int * list)
-{
-  int ier;
-  char * pch;
-  char line[MAXLINE];
-  int i = 0;
-
-  strcpy(line, linePtr);
-  pch = strtok(line, " \t\n\r");
-  while (pch != NULL)
-  {
-    ier = sscanf(pch, "%d", &list[i]);
-    if (ier != 1) { return true; }
-    pch = strtok(NULL, " \t\n\r");
-    i += 1;
-  }
-  if (i != N) { return true; }
-
-  return false;
-}
-
-//******************************************************************************
-void ANNImplementation::lowerCase(char * linePtr)
-{
-  for (int i = 0; linePtr[i]; i++) { linePtr[i] = tolower(linePtr[i]); }
 }
 
 //******************************************************************************
