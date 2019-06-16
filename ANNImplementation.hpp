@@ -29,12 +29,12 @@
 #ifndef ANN_IMPLEMENTATION_HPP_
 #define ANN_IMPLEMENTATION_HPP_
 
+#include <vector>
 #include "ANN.hpp"
 #include "KIM_LogMacros.hpp"
 #include "descriptor.h"
 #include "helper.hpp"
 #include "network.h"
-#include <vector>
 
 #define DIM 3
 #define ONE 1.0

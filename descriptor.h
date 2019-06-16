@@ -65,14 +65,19 @@ class Descriptor
   ~Descriptor();
 
   // initialization helper
-  void set_cutfunc(char * name);
+  int read_parameters(FILE * const filePointer);
+
   void add_descriptor(char * name, double ** values, int row, int col);
   void set_center_and_normalize(bool do_center_and_normalize,
                                 int size,
                                 double * means,
                                 double * stds);
+  void set_cutoff(char * name, int ncutoff, double * value);
+
+  void get_cutoff(int& ncutoff, double *& cutoff);
 
   int get_num_descriptors();
+
 
   // symmetry functions
   void sym_g1(double r, double rcut, double & phi);
@@ -146,9 +151,10 @@ class Descriptor
   }
 
 
- //private:
-  CutoffFunction cutoff;
-  dCutoffFunction d_cutoff;
+  CutoffFunction cutoff_func;
+  dCutoffFunction d_cutoff_func;
+  private:
+    std::vector<double> cutoff;
 };
 
 

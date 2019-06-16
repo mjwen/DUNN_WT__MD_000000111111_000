@@ -40,7 +40,7 @@
 #include <cstring>
 
 
-// typedefs
+#define MAXLINE 20480
 typedef double VectorOfSizeDIM[3];
 typedef double VectorOfSizeSix[6];
 

@@ -33,11 +33,9 @@
 #include <iostream>
 #include <map>
 
-#include "ANN.hpp"
 #include "ANNImplementation.hpp"
 #include "KIM_ModelDriverHeaders.hpp"
 
-#define MAXLINE 20480
 
 //==============================================================================
 //
@@ -317,18 +315,11 @@ int ANNImplementation::ProcessParameterFiles(
   // int N;
   int endOfFileFlag = 0;
   char nextLine[MAXLINE];
-  char errorMsg[MAXLINE];
-  char name[1024];
-  double cutoff;
-
-  // descriptor
-  int numDescTypes;
-  int numDescs;
-  int numParams;
-  int numParamSets;
-  double ** descParams = NULL;
+  char errorMsg[1024];
+  char name[128];
 
   // network
+  int numDescs;
   int numLayers;
   int * numPerceptrons;
 
@@ -337,7 +328,7 @@ int ANNImplementation::ProcessParameterFiles(
   // descriptor info
   //#######################
 
-  //TODO modify  should readin from file
+  //TODO modify should readin from file
   index = 0;
   strcpy(spec, "C");
   KIM::SpeciesName const specName(spec);
@@ -348,255 +339,26 @@ int ANNImplementation::ProcessParameterFiles(
   numberUniqueSpeciesPairs_ = ((numberModelSpecies_ + 1) * numberModelSpecies_) / 2;
   AllocateParameterMemory();
 
-  // cutoff
-  getNextDataLine(parameterFilePointers[0], nextLine, MAXLINE, &endOfFileFlag);
-  ier = sscanf(nextLine, "%s %lf", name, &cutoff);
-  if (ier != 2)
-  {
-    sprintf(errorMsg, "unable to read cutoff from line:\n");
-    strcat(errorMsg, nextLine);
-    LOG_ERROR(errorMsg);
-    return true;
-  }
 
-  // register cutoff
-  lowerCase(name);
-  if (strcmp(name, "cos") != 0 && strcmp(name, "exp") != 0)
-  {
-    sprintf(errorMsg,
-            "unsupported cutoff type. Expecting `cos', or `exp' "
-            "given %s.\n",
-            name);
+  //#######################
+  // descriptor params
+  //#######################
+  ier = descriptor_->read_parameters(parameterFilePointers[0]);
+   if (ier) {
+    sprintf(errorMsg, "unable to read descriptor parameter file\n");
     LOG_ERROR(errorMsg);
     return true;
   }
-  descriptor_->set_cutfunc(name);
 
 
   // TODO modifiy this such that each pair has its own cutoff
   // use of numberUniqueSpeciesPairs is not good. Since it requires the Model
   // provide all the params that the Driver supports. number of species should
   // be read in from the input file.
-  for (int i = 0; i < numberUniqueSpeciesPairs_; i++) { cutoff_[i] = cutoff; }
-
-  // number of descriptor types
-  getNextDataLine(parameterFilePointers[0], nextLine, MAXLINE, &endOfFileFlag);
-  ier = sscanf(nextLine, "%d", &numDescTypes);
-  if (ier != 1)
-  {
-    sprintf(errorMsg, "unable to read number of descriptor types from line:\n");
-    strcat(errorMsg, nextLine);
-    LOG_ERROR(errorMsg);
-    return true;
-  }
-
-  // descriptor
-  for (int i = 0; i < numDescTypes; i++)
-  {
-    // descriptor name and parameter dimensions
-    getNextDataLine(parameterFilePointers[0], nextLine, MAXLINE, &endOfFileFlag);
-
-    // name of descriptor
-    ier = sscanf(nextLine, "%s", name);
-    if (ier != 1)
-    {
-      sprintf(errorMsg, "unable to read descriptor from line:\n");
-      strcat(errorMsg, nextLine);
-      LOG_ERROR(errorMsg);
-      return true;
-    }
-    lowerCase(name);  // change to lower case name
-    if (strcmp(name, "g1") == 0)
-    {  // G1
-      descriptor_->add_descriptor(name, NULL, 1, 0);
-    }
-    else
-    {
-      // re-read name, and read number of param sets and number of params
-      ier = sscanf(nextLine, "%s %d %d", name, &numParamSets, &numParams);
-      if (ier != 3)
-      {
-        sprintf(errorMsg, "unable to read descriptor from line:\n");
-        strcat(errorMsg, nextLine);
-        LOG_ERROR(errorMsg);
-        return true;
-      }
-      // change name to lower case
-      lowerCase(name);
-
-      // check size of params is correct w.r.t its name
-      if (strcmp(name, "g2") == 0)
-      {
-        if (numParams != 2)
-        {
-          sprintf(errorMsg,
-                  "number of params for descriptor G2 is incorrect, "
-                  "expecting 2, but given %d.\n",
-                  numParams);
-          LOG_ERROR(errorMsg);
-          return true;
-        }
-      }
-      else if (strcmp(name, "g3") == 0)
-      {
-        if (numParams != 1)
-        {
-          sprintf(errorMsg,
-                  "number of params for descriptor G3 is incorrect, "
-                  "expecting 1, but given %d.\n",
-                  numParams);
-          LOG_ERROR(errorMsg);
-          return true;
-        }
-      }
-      else if (strcmp(name, "g4") == 0)
-      {
-        if (numParams != 3)
-        {
-          sprintf(errorMsg,
-                  "number of params for descriptor G4 is incorrect, "
-                  "expecting 3, but given %d.\n",
-                  numParams);
-          LOG_ERROR(errorMsg);
-          return true;
-        }
-      }
-      else if (strcmp(name, "g5") == 0)
-      {
-        if (numParams != 3)
-        {
-          sprintf(errorMsg,
-                  "number of params for descriptor G5 is incorrect, "
-                  "expecting 3, but given %d.\n",
-                  numParams);
-          LOG_ERROR(errorMsg);
-          return true;
-        }
-      }
-      else
-      {
-        sprintf(errorMsg, "unsupported descriptor `%s' from line:\n", name);
-        strcat(errorMsg, nextLine);
-        LOG_ERROR(errorMsg);
-        return true;
-      }
-
-      // read descriptor params
-      AllocateAndInitialize2DArray<double>(descParams, numParamSets, numParams);
-      for (int j = 0; j < numParamSets; j++)
-      {
-        getNextDataLine(
-            parameterFilePointers[0], nextLine, MAXLINE, &endOfFileFlag);
-        ier = getXdouble(nextLine, numParams, descParams[j]);
-        if (ier)
-        {
-          sprintf(errorMsg,
-                  "unable to read descriptor parameters from line:\n");
-          strcat(errorMsg, nextLine);
-          LOG_ERROR(errorMsg);
-          return true;
-        }
-      }
-
-      // copy data to Descriptor
-      descriptor_->add_descriptor(name, descParams, numParamSets, numParams);
-      Deallocate2DArray(descParams);
-    }
-  }
-  // number of descriptors
-  numDescs = descriptor_->get_num_descriptors();
-
-  // centering and normalizing params
-  // flag, whether we use this feature
-  getNextDataLine(parameterFilePointers[0], nextLine, MAXLINE, &endOfFileFlag);
-  ier = sscanf(nextLine, "%*s %s", name);
-  if (ier != 1)
-  {
-    sprintf(errorMsg,
-            "unable to read centering and normalization info from line:\n");
-    strcat(errorMsg, nextLine);
-    LOG_ERROR(errorMsg);
-    return true;
-  }
-  lowerCase(name);
-  bool do_center_and_normalize;
-  if (strcmp(name, "true") == 0) { do_center_and_normalize = true; }
-  else
-  {
-    do_center_and_normalize = false;
-  }
-
-  int size = 0;
-  double * means = NULL;
-  double * stds = NULL;
-  if (do_center_and_normalize)
-  {
-    // size of the data, this should be equal to numDescs
-    getNextDataLine(
-        parameterFilePointers[0], nextLine, MAXLINE, &endOfFileFlag);
-    ier = sscanf(nextLine, "%d", &size);
-    if (ier != 1)
-    {
-      sprintf(errorMsg,
-              "unable to read the size of centering and normalization "
-              "data info from line:\n");
-      strcat(errorMsg, nextLine);
-      LOG_ERROR(errorMsg);
-      return true;
-    }
-    if (size != numDescs)
-    {
-      sprintf(errorMsg,
-              "Size of centering and normalizing data inconsistent with "
-              "the number of descriptors. Size = %d, num_descriptors=%d\n",
-              size,
-              numDescs);
-      LOG_ERROR(errorMsg);
-      return true;
-    }
-
-    // read means
-    AllocateAndInitialize1DArray<double>(means, size);
-    for (int i = 0; i < size; i++)
-    {
-      getNextDataLine(
-          parameterFilePointers[0], nextLine, MAXLINE, &endOfFileFlag);
-      ier = sscanf(nextLine, "%lf", &means[i]);
-      if (ier != 1)
-      {
-        sprintf(errorMsg, "unable to read `means' from line:\n");
-        strcat(errorMsg, nextLine);
-        LOG_ERROR(errorMsg);
-        return true;
-      }
-    }
-
-    // read standard deviations
-    AllocateAndInitialize1DArray<double>(stds, size);
-    for (int i = 0; i < size; i++)
-    {
-      getNextDataLine(
-          parameterFilePointers[0], nextLine, MAXLINE, &endOfFileFlag);
-      ier = sscanf(nextLine, "%lf", &stds[i]);
-      if (ier != 1)
-      {
-        sprintf(errorMsg, "unable to read `means' from line:\n");
-        strcat(errorMsg, nextLine);
-        LOG_ERROR(errorMsg);
-        return true;
-      }
-    }
-  }
-
-  // store info into descriptor class
-  descriptor_->set_center_and_normalize(
-      do_center_and_normalize, size, means, stds);
-  Deallocate1DArray(means);
-  Deallocate1DArray(stds);
-
-  // TODO delete
-  //  descriptor_->echo_input();
-
+  int ncutoff;
+  double* cutoff;
+  descriptor_->get_cutoff(ncutoff, cutoff);
+  for (int i = 0; i < numberUniqueSpeciesPairs_; i++) { cutoff_[i] = cutoff[0];}
 
   //#######################
   // model parameters
@@ -627,6 +389,7 @@ int ANNImplementation::ProcessParameterFiles(
   }
 
   // copy to network class
+  numDescs = descriptor_->get_num_descriptors();
   network_->set_nn_structure(numDescs, numLayers, numPerceptrons);
 
   // activation function
@@ -647,8 +410,7 @@ int ANNImplementation::ProcessParameterFiles(
   {
     sprintf(errorMsg,
             "unsupported activation function. Expecting `sigmoid`, `tanh` "
-            " `relu` or `elu`, given %s.\n",
-            name);
+            " `relu` or `elu`, given %s.\n", name);
     LOG_ERROR(errorMsg);
     return true;
   }
