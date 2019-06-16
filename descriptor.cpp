@@ -27,7 +27,6 @@
 //
 
 
-#include <iostream>
 #include "descriptor.h"
 
 #define LOG_ERROR(msg) (std::cerr<<"ERROR (descriptor): "<< (msg) <<std::endl)
@@ -44,7 +43,7 @@ Descriptor::~Descriptor()
   }
 }
 
-int Descriptor::read_parameters(FILE * const filePointer)
+int Descriptor::read_parameter_file(FILE * const filePointer)
 {
   int ier;
   int endOfFileFlag = 0;

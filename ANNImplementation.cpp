@@ -311,22 +311,8 @@ int ANNImplementation::ProcessParameterFiles(
   int ier;
   int index;
   char spec[MAXLINE];
-
-  // int N;
-  int endOfFileFlag = 0;
-  char nextLine[MAXLINE];
   char errorMsg[1024];
-  char name[128];
 
-  // network
-  int numDescs;
-  int numLayers;
-  int * numPerceptrons;
-
-
-  //#######################
-  // descriptor info
-  //#######################
 
   //TODO modify should readin from file
   index = 0;
@@ -343,8 +329,8 @@ int ANNImplementation::ProcessParameterFiles(
   //#######################
   // descriptor params
   //#######################
-  ier = descriptor_->read_parameters(parameterFilePointers[0]);
-   if (ier) {
+  ier = descriptor_->read_parameter_file(parameterFilePointers[0]);
+  if (ier) {
     sprintf(errorMsg, "unable to read descriptor parameter file\n");
     LOG_ERROR(errorMsg);
     return true;
@@ -364,175 +350,24 @@ int ANNImplementation::ProcessParameterFiles(
   // model parameters
   //#######################
 
-  // network structure
-  // number of layers
-  getNextDataLine(parameterFilePointers[1], nextLine, MAXLINE, &endOfFileFlag);
-  ier = sscanf(nextLine, "%d", &numLayers);
-  if (ier != 1)
-  {
-    sprintf(errorMsg, "unable to read number of layers from line:\n");
-    strcat(errorMsg, nextLine);
+  int desc_size = descriptor_->get_num_descriptors();
+  ier = network_->read_parameter_file(parameterFilePointers[1], desc_size);
+  if (ier) {
+    sprintf(errorMsg, "unable to read neural network parameter file\n");
     LOG_ERROR(errorMsg);
     return true;
-  }
-
-  // number of perceptrons in each layer
-  numPerceptrons = new int[numLayers];
-  getNextDataLine(parameterFilePointers[1], nextLine, MAXLINE, &endOfFileFlag);
-  ier = getXint(nextLine, numLayers, numPerceptrons);
-  if (ier)
-  {
-    sprintf(errorMsg, "unable to read number of perceptrons from line:\n");
-    strcat(errorMsg, nextLine);
-    LOG_ERROR(errorMsg);
-    return true;
-  }
-
-  // copy to network class
-  numDescs = descriptor_->get_num_descriptors();
-  network_->set_nn_structure(numDescs, numLayers, numPerceptrons);
-
-  // activation function
-  getNextDataLine(parameterFilePointers[1], nextLine, MAXLINE, &endOfFileFlag);
-  ier = sscanf(nextLine, "%s", name);
-  if (ier != 1)
-  {
-    sprintf(errorMsg, "unable to read `activation function` from line:\n");
-    strcat(errorMsg, nextLine);
-    LOG_ERROR(errorMsg);
-    return true;
-  }
-
-  // register activation function
-  lowerCase(name);
-  if (strcmp(name, "sigmoid") != 0 && strcmp(name, "tanh") != 0
-      && strcmp(name, "relu") != 0 && strcmp(name, "elu") != 0)
-  {
-    sprintf(errorMsg,
-            "unsupported activation function. Expecting `sigmoid`, `tanh` "
-            " `relu` or `elu`, given %s.\n", name);
-    LOG_ERROR(errorMsg);
-    return true;
-  }
-  network_->set_activation(name);
-
-  // keep probability
-  double * keep_prob;
-  AllocateAndInitialize1DArray<double>(keep_prob, numLayers);
-
-  getNextDataLine(parameterFilePointers[1], nextLine, MAXLINE, &endOfFileFlag);
-  ier = getXdouble(nextLine, numLayers, keep_prob);
-  if (ier)
-  {
-    sprintf(errorMsg, "unable to read `keep probability` from line:\n");
-    strcat(errorMsg, nextLine);
-    LOG_ERROR(errorMsg);
-    return true;
-  }
-  network_->set_keep_prob(keep_prob);
-  Deallocate1DArray(keep_prob);
-
-  // weights and biases
-  for (int i = 0; i < numLayers; i++)
-  {
-    double ** weight;
-    double * bias;
-    int row;
-    int col;
-
-    if (i == 0)
-    {
-      row = numDescs;
-      col = numPerceptrons[i];
-    }
-    else
-    {
-      row = numPerceptrons[i - 1];
-      col = numPerceptrons[i];
-    }
-
-    AllocateAndInitialize2DArray<double>(weight, row, col);
-    for (int j = 0; j < row; j++)
-    {
-      getNextDataLine(
-          parameterFilePointers[1], nextLine, MAXLINE, &endOfFileFlag);
-      ier = getXdouble(nextLine, col, weight[j]);
-      if (ier)
-      {
-        sprintf(errorMsg, "unable to read `weight` from line:\n");
-        strcat(errorMsg, nextLine);
-        LOG_ERROR(errorMsg);
-        return true;
-      }
-    }
-
-    // bias
-    AllocateAndInitialize1DArray<double>(bias, col);
-    getNextDataLine(
-        parameterFilePointers[1], nextLine, MAXLINE, &endOfFileFlag);
-    ier = getXdouble(nextLine, col, bias);
-    if (ier)
-    {
-      sprintf(errorMsg, "unable to read `bias` from line:\n");
-      strcat(errorMsg, nextLine);
-      LOG_ERROR(errorMsg);
-      return true;
-    }
-
-    // copy to network class
-    network_->add_weight_bias(weight, bias, i);
-
-    Deallocate2DArray(weight);
-    Deallocate1DArray(bias);
   }
 
 
   //#######################
   // read dropout binary
   //#######################
-
-  getNextDataLine(parameterFilePointers[2], nextLine, MAXLINE, &endOfFileFlag);
-  int ensemble_size;
-  ier = sscanf(nextLine, "%d", &ensemble_size);
-  if (ier != 1)
-  {
-    sprintf(errorMsg, "unable to read ensemble_size from line:\n");
-    strcat(errorMsg, nextLine);
+  ier = network_->read_dropout_file(parameterFilePointers[2]);
+  if (ier) {
+    sprintf(errorMsg, "unable to read dropout file\n");
     LOG_ERROR(errorMsg);
     return true;
   }
-
-  network_->set_ensemble_size(ensemble_size);
-
-  for (int i = 0; i < ensemble_size; i++)
-  {
-    for (int j = 0; j < numLayers; j++)
-    {
-      int size;
-      if (j == 0) { size = numDescs; }
-      else
-      {
-        size = numPerceptrons[j - 1];
-      }
-
-      int * row_binary = new int[size];
-      getNextDataLine(
-          parameterFilePointers[2], nextLine, MAXLINE, &endOfFileFlag);
-      ier = getXint(nextLine, size, row_binary);
-      if (ier)
-      {
-        sprintf(errorMsg, "unable to read dropout binary from line:\n");
-        strcat(errorMsg, nextLine);
-        LOG_ERROR(errorMsg);
-        return true;
-      }
-      network_->add_dropout_binary(i, j, size, row_binary);
-      delete[] row_binary;
-    }
-  }
-
-
-  delete[] numPerceptrons;
 
 
   // everything is good

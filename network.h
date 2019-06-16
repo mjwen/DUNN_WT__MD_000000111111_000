@@ -29,11 +29,11 @@
 #ifndef NETWORK_H_
 #define NETWORK_H_
 
-#include "helper.hpp"
 #include <Eigen/Core>
 #include <cmath>
 #include <iostream>
 #include <vector>
+#include "helper.hpp"
 
 using namespace Eigen;
 
@@ -53,6 +53,9 @@ class NeuralNetwork
   void set_activation(char * name);
   void set_keep_prob(double * keep_prob);
   void add_weight_bias(double ** weight, double * bias, int layer);
+  int read_parameter_file(FILE * const filePointer, int desc_size);
+  int read_dropout_file(FILE * const filePointer);
+
   void forward(double * zeta,
                const int rows,
                const int cols,

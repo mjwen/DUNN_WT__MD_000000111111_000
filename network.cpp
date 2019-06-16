@@ -28,10 +28,200 @@
 
 #include "network.h"
 
+#define LOG_ERROR(msg) (std::cerr<<"ERROR (NeuralNetwork): "<<(msg)<<std::endl)
+
+
 // Nothing to do at this moment
 NeuralNetwork::NeuralNetwork() : ensemble_size_(0) {}
 
 NeuralNetwork::~NeuralNetwork() {}
+
+
+int NeuralNetwork::read_parameter_file(FILE * const filePointer, int desc_size)
+{
+  int ier;
+  int endOfFileFlag = 0;
+  char nextLine[MAXLINE];
+  char errorMsg[1024];
+  char name[128];
+  int numLayers;
+  int * numNodes;
+
+
+  // number of layers
+  getNextDataLine(filePointer, nextLine, MAXLINE, &endOfFileFlag);
+  ier = sscanf(nextLine, "%d", &numLayers);
+  if (ier != 1)
+  {
+    sprintf(errorMsg, "unable to read number of layers from line:\n");
+    strcat(errorMsg, nextLine);
+    LOG_ERROR(errorMsg);
+    return true;
+  }
+
+  // number of nodes in each layer
+  numNodes = new int[numLayers];
+  getNextDataLine(filePointer, nextLine, MAXLINE, &endOfFileFlag);
+  ier = getXint(nextLine, numLayers, numNodes);
+  if (ier)
+  {
+    sprintf(errorMsg, "unable to read number of nodes from line:\n");
+    strcat(errorMsg, nextLine);
+    LOG_ERROR(errorMsg);
+    return true;
+  }
+  set_nn_structure(desc_size, numLayers, numNodes);
+
+  // activation function
+  getNextDataLine(filePointer, nextLine, MAXLINE, &endOfFileFlag);
+  ier = sscanf(nextLine, "%s", name);
+  if (ier != 1)
+  {
+    sprintf(errorMsg, "unable to read `activation function` from line:\n");
+    strcat(errorMsg, nextLine);
+    LOG_ERROR(errorMsg);
+    return true;
+  }
+
+  // register activation function
+  lowerCase(name);
+  if (strcmp(name, "sigmoid") != 0 && strcmp(name, "tanh") != 0
+      && strcmp(name, "relu") != 0 && strcmp(name, "elu") != 0)
+  {
+    sprintf(errorMsg,
+        "unsupported activation function. Expecting `sigmoid`, `tanh` "
+        " `relu` or `elu`, given %s.\n", name);
+    LOG_ERROR(errorMsg);
+    return true;
+  }
+  set_activation(name);
+
+  // keep probability
+  double * keep_prob;
+  AllocateAndInitialize1DArray<double>(keep_prob, numLayers);
+
+  getNextDataLine(filePointer, nextLine, MAXLINE, &endOfFileFlag);
+  ier = getXdouble(nextLine, numLayers, keep_prob);
+  if (ier)
+  {
+    sprintf(errorMsg, "unable to read `keep probability` from line:\n");
+    strcat(errorMsg, nextLine);
+    LOG_ERROR(errorMsg);
+    return true;
+  }
+  set_keep_prob(keep_prob);
+  Deallocate1DArray(keep_prob);
+
+  // weights and biases
+  for (int i = 0; i < numLayers; i++)
+  {
+    double ** weight;
+    double * bias;
+    int row;
+    int col;
+
+    if (i == 0)
+    {
+      row = desc_size;
+      col = numNodes[i];
+    }
+    else
+    {
+      row = numNodes[i - 1];
+      col = numNodes[i];
+    }
+
+    AllocateAndInitialize2DArray<double>(weight, row, col);
+    for (int j = 0; j < row; j++)
+    {
+      getNextDataLine(filePointer, nextLine, MAXLINE, &endOfFileFlag);
+      ier = getXdouble(nextLine, col, weight[j]);
+      if (ier)
+      {
+        sprintf(errorMsg, "unable to read `weight` from line:\n");
+        strcat(errorMsg, nextLine);
+        LOG_ERROR(errorMsg);
+        return true;
+      }
+    }
+
+    // bias
+    AllocateAndInitialize1DArray<double>(bias, col);
+    getNextDataLine( filePointer, nextLine, MAXLINE, &endOfFileFlag);
+    ier = getXdouble(nextLine, col, bias);
+    if (ier)
+    {
+      sprintf(errorMsg, "unable to read `bias` from line:\n");
+      strcat(errorMsg, nextLine);
+      LOG_ERROR(errorMsg);
+      return true;
+    }
+
+    // copy to network class
+    add_weight_bias(weight, bias, i);
+
+    Deallocate2DArray(weight);
+    Deallocate1DArray(bias);
+  }
+
+  delete[] numNodes;
+
+  // everything is OK
+  return false;
+}
+
+int NeuralNetwork::read_dropout_file(FILE * const filePointer)
+{
+  int ier;
+  int endOfFileFlag = 0;
+  char nextLine[MAXLINE];
+  char errorMsg[1024];
+
+
+  getNextDataLine(filePointer, nextLine, MAXLINE, &endOfFileFlag);
+  int ensemble_size;
+  ier = sscanf(nextLine, "%d", &ensemble_size);
+  if (ier != 1)
+  {
+    sprintf(errorMsg, "unable to read ensemble_size from line:\n");
+    strcat(errorMsg, nextLine);
+    LOG_ERROR(errorMsg);
+    return true;
+  }
+  set_ensemble_size(ensemble_size);
+
+
+  for (int i = 0; i < ensemble_size; i++)
+  {
+    for (int j = 0; j < Nlayers_; j++)
+    {
+      int size;
+      if (j == 0) { size = inputSize_; }
+      else
+      {
+        size = layerSizes_[j - 1];
+      }
+
+      int * row_binary = new int[size];
+      getNextDataLine(filePointer, nextLine, MAXLINE, &endOfFileFlag);
+      ier = getXint(nextLine, size, row_binary);
+      if (ier)
+      {
+        sprintf(errorMsg, "unable to read dropout binary from line:\n");
+        strcat(errorMsg, nextLine);
+        LOG_ERROR(errorMsg);
+        return true;
+      }
+      add_dropout_binary(i, j, size, row_binary);
+      delete[] row_binary;
+    }
+  }
+
+  // everything is OK
+  return false;
+}
+
+
 
 void NeuralNetwork::set_nn_structure(int size_input,
                                      int num_layers,

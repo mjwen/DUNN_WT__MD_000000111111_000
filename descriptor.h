@@ -65,7 +65,7 @@ class Descriptor
   ~Descriptor();
 
   // initialization helper
-  int read_parameters(FILE * const filePointer);
+  int read_parameter_file(FILE * const filePointer);
 
   void add_descriptor(char * name, double ** values, int row, int col);
   void set_center_and_normalize(bool do_center_and_normalize,
