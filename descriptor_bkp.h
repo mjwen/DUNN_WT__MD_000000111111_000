@@ -34,12 +34,10 @@
 #include <iostream>
 #include <string>
 #include <vector>
-#include <map>
 
 #include "helper.hpp"
 
 #define MY_PI 3.1415926535897932
-#define DIM 3
 
 // Symmetry functions taken from:
 
@@ -52,50 +50,34 @@ class Descriptor
   Descriptor();
   ~Descriptor();
 
-  void set_species(std::vector<std::string> & species);
-  void get_species(std::vector<std::string> & species);
-  int get_num_species();
-  void set_cutoff(char const * name, int const Nspecies, double const * rcut_2D);
-  double get_cutoff(int iCode, int jCode);
+  std::vector<std::string> name;  // name of each descriptor
+  std::vector<int> starting_index;  // starting index of each descriptor
+                                    // in generalized coords
+  std::vector<double **> params;  // params of each descriptor
+  std::vector<int>
+      num_param_sets;  // number of parameter sets of each descriptor
+  std::vector<int> num_params;  // size of parameters of each descriptor
+  bool has_three_body;
 
-  void add_descriptor(char const * name, double const * values, int const row, int const col);
+  bool center_and_normalize;  // whether to center and normalize the data
+  std::vector<double> features_mean;
+  std::vector<double> features_std;
+
+
+  // initialization helper
   int read_parameter_file(FILE * const filePointer);
+
+  void add_descriptor(char * name, double ** values, int row, int col);
+  void set_center_and_normalize(bool do_center_and_normalize,
+                                int size,
+                                double * means,
+                                double * stds);
+  void set_cutoff(char * name, int ncutoff, double * value);
+
+  void get_cutoff(int & ncutoff, double *& cutoff);
+
   int get_num_descriptors();
-  void set_feature_mean_and_std(bool normalize,
-                                int const size,
-                                double const * means,
-                                double const * stds);
-  void get_feature_mean_and_std(int i, double &mean, double &std);
-  bool need_normalize();
- void generate_one_atom(int const i,
-                        VectorOfSizeDIM const * const coordinates,
-                            int const * particleSpeciesCode,
-                            int const * neighlist,
-                            int const numnei,
-                            double * const desc,
-                            double * const grad_desc,
-                            bool grad);
 
-
-
-
- private:
-
-  std::vector<std::string> species_;
-  double** rcut_2D_;
-
-  std::vector<std::string> name_;  // name of each descriptor
-  std::vector<int> starting_index_;  // starting index of each descriptor
-                                     // in generalized coords
-  std::vector<double **> params_;  // params of each descriptor
-  std::vector<int> num_param_sets_;  // number of parameter sets of each descriptor
-  std::vector<int> num_params_;  // size of parameters of each descriptor
-  bool has_three_body_;
-
-
-  bool normalize_;  // whether to normalize the data
-  std::vector<double> feature_mean_;
-  std::vector<double> feature_std_;
 
   // symmetry functions
   void sym_g1(double r, double rcut, double & phi);
@@ -143,33 +125,37 @@ class Descriptor
   void echo_input()
   {
     std::cout << "=====================================" << std::endl;
-    for (size_t i = 0; i < name_.size(); i++)
+    for (size_t i = 0; i < name.size(); i++)
     {
-      int rows = num_param_sets_.at(i);
-      int cols = num_params_.at(i);
-      std::cout << "name: " << name_.at(i) << ", rows: " << rows
+      int rows = num_param_sets.at(i);
+      int cols = num_params.at(i);
+      std::cout << "name: " << name.at(i) << ", rows: " << rows
                 << ", cols: " << cols << std::endl;
       for (int m = 0; m < rows; m++)
       {
         for (int n = 0; n < cols; n++)
-        { std::cout << params_.at(i)[m][n] << " "; }
+        { std::cout << params.at(i)[m][n] << " "; }
         std::cout << std::endl;
       }
       std::cout << std::endl;
     }
 
-    // centering and normalization std::cout << "centering and normalizing params" << std::endl;
+    // centering and normalization
+    std::cout << "centering and normalizing params" << std::endl;
     std::cout << "means:" << std::endl;
-    for (size_t i = 0; i < feature_mean_.size(); i++)
-    { std::cout << feature_mean_.at(i) << std::endl; }
+    for (size_t i = 0; i < features_mean.size(); i++)
+    { std::cout << features_mean.at(i) << std::endl; }
     std::cout << "stds:" << std::endl;
-    for (size_t i = 0; i < feature_std_.size(); i++)
-    { std::cout << feature_std_.at(i) << std::endl; }
+    for (size_t i = 0; i < features_std.size(); i++)
+    { std::cout << features_std.at(i) << std::endl; }
   }
 
 
-  CutoffFunction cutoff_func_;
-  dCutoffFunction d_cutoff_func_;
+  CutoffFunction cutoff_func;
+  dCutoffFunction d_cutoff_func;
+
+ private:
+  std::vector<double> cutoff;
 };
 
 
@@ -191,6 +177,23 @@ inline double d_cut_cos(double r, double rcut)
 }
 
 
+// TODO correct it
+inline double cut_exp(double r, double rcut)
+{
+  if (r < rcut) { return 1; }
+  else
+  {
+    return 0.0;
+  }
+}
+
+inline double d_cut_exp(double r, double rcut)
+{
+  if (r < rcut)
+    return 0.0;
+  else
+    return 0.0;
+}
 
 
 #endif  // DESCRIPTOR_H_

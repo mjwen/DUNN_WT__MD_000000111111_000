@@ -54,10 +54,6 @@ ANNImplementation::ANNImplementation(
     KIM::TemperatureUnit const requestedTemperatureUnit,
     KIM::TimeUnit const requestedTimeUnit,
     int * const ier) :
-    numberModelSpecies_(0),
-    numberUniqueSpeciesPairs_(0),
-    cutoff_(NULL),
-    cutoffSq_2D_(NULL),
     influenceDistance_(0.0),
     modelWillNotRequestNeighborsOfNoncontributingParticles_(1),
     cachedNumberOfParticles_(0)
@@ -115,8 +111,6 @@ ANNImplementation::~ANNImplementation()
 
   delete descriptor_;
   delete network_;
-  Deallocate1DArray<double>(cutoff_);
-  Deallocate2DArray<double>(cutoffSq_2D_);
 }
 
 
@@ -246,10 +240,8 @@ void ANNImplementation::AllocatePrivateParameterMemory()
 
 //******************************************************************************
 void ANNImplementation::AllocateParameterMemory()
-{  // allocate memory for data
-  AllocateAndInitialize1DArray<double>(cutoff_, numberUniqueSpeciesPairs_);
-  AllocateAndInitialize2DArray<double>(
-      cutoffSq_2D_, numberModelSpecies_, numberModelSpecies_);
+{
+  // nothing to do for this case
 }
 
 
@@ -309,21 +301,8 @@ int ANNImplementation::ProcessParameterFiles(
   (void) numberParameterFiles;  // avoid not used warning
 
   int ier;
-  int index;
-  char spec[MAXLINE];
   char errorMsg[1024];
 
-
-  //TODO modify should readin from file
-  index = 0;
-  strcpy(spec, "C");
-  KIM::SpeciesName const specName(spec);
-  ier = modelDriverCreate->SetSpeciesCode(specName, index);
-  if (ier) { return ier; }
-  modelSpeciesCodeList_.push_back(index);
-  numberModelSpecies_ = 1;
-  numberUniqueSpeciesPairs_ = ((numberModelSpecies_ + 1) * numberModelSpecies_) / 2;
-  AllocateParameterMemory();
 
 
   //#######################
@@ -336,15 +315,21 @@ int ANNImplementation::ProcessParameterFiles(
     return true;
   }
 
+  // set species
+  int Nspecies = descriptor_->get_num_species();
+  std::vector<std::string> species;
+  descriptor_->get_species(species);
+  for (int i =0; i<Nspecies; i++) {
+    KIM::SpeciesName const specName(species[i]);
+    if (! specName.Known()) {
+      sprintf(errorMsg, "get unknown species\n");
+      LOG_ERROR(errorMsg);
+      return true;
+    }
+    ier = modelDriverCreate->SetSpeciesCode(specName, i);
+    if (ier) { return ier; }
+  }
 
-  // TODO modifiy this such that each pair has its own cutoff
-  // use of numberUniqueSpeciesPairs is not good. Since it requires the Model
-  // provide all the params that the Driver supports. number of species should
-  // be read in from the input file.
-  int ncutoff;
-  double* cutoff;
-  descriptor_->get_cutoff(ncutoff, cutoff);
-  for (int i = 0; i < numberUniqueSpeciesPairs_; i++) { cutoff_[i] = cutoff[0];}
 
   //#######################
   // model parameters
@@ -595,34 +580,16 @@ int ANNImplementation::SetRefreshMutableValues(ModelObj * const modelObj)
   //       modelRefresh object when the Model's parameters have been altered
   int ier;
 
-  // update parameters
-  for (int i = 0; i < numberModelSpecies_; ++i)
-  {
-    for (int j = 0; j <= i; ++j)
-    {
-      int const index = j * numberModelSpecies_ + i - (j * j + j) / 2;
-      cutoffSq_2D_[i][j] = cutoffSq_2D_[j][i] = cutoff_[index] * cutoff_[index];
-    }
-  }
-
   // update cutoff value in KIM API object
+  int Nspecies = descriptor_->get_num_species();
   influenceDistance_ = 0.0;
-
-  for (int i = 0; i < numberModelSpecies_; i++)
-  {
-    int indexI = modelSpeciesCodeList_[i];
-
-    for (int j = 0; j < numberModelSpecies_; j++)
-    {
-      int indexJ = modelSpeciesCodeList_[j];
-
-      if (influenceDistance_ < cutoffSq_2D_[indexI][indexJ])
-      { influenceDistance_ = cutoffSq_2D_[indexI][indexJ]; }
+  for (int i = 0; i < Nspecies; i++) {
+    for (int j = 0; j < Nspecies; j++) {
+      double cutoff = descriptor_->get_cutoff(i, j);
+      if (influenceDistance_ < cutoff)
+      { influenceDistance_ = cutoff; }
     }
   }
-
-  influenceDistance_ = sqrt(influenceDistance_);
-
 
   modelObj->SetInfluenceDistancePointer(&influenceDistance_);
   modelObj->SetNeighborListPointers(
@@ -730,7 +697,7 @@ int ANNImplementation::CheckParticleSpeciesCodes(
   for (int i = 0; i < cachedNumberOfParticles_; ++i)
   {
     if ((particleSpeciesCodes[i] < 0)
-        || (particleSpeciesCodes[i] >= numberModelSpecies_))
+        || (particleSpeciesCodes[i] >= descriptor_->get_num_species()))
     {
       ier = true;
       LOG_ERROR("unsupported particle species codes detected");
