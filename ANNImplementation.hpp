@@ -90,7 +90,7 @@ class ANNImplementation
   //   Memory allocated in AllocateParameterMemory() (from constructor)
   //   Memory deallocated in destructor
   //   Data set in ReadParameterFile routines OR by KIM Simulator
-  int ensemble_mode_;
+  int active_member_id_;
 
   // Mutable values that only change when Refresh() executes
   //   Set in Refresh (via SetRefreshMutableValues)
@@ -100,7 +100,7 @@ class ANNImplementation
   // none
   //
   // ANNImplementation: values (changed only by Refresh())
-  int last_ensemble_mode_;
+  int last_active_member_id_;
   double influenceDistance_;
   int modelWillNotRequestNeighborsOfNoncontributingParticles_;
 
@@ -259,17 +259,18 @@ int ANNImplementation::Compute(
       && (isComputeParticleVirial == false))
   { return ier; }
 
+  ier = true;
 
   if (isComputeProcess_dEdr == true)
   {
     LOG_ERROR("process_dEdr not supported by this driver");
-    return true;
+    return ier;
   }
 
   if (isComputeProcess_d2Edr2 == true)
   {
     LOG_ERROR("process_d2Edr2 not supported by this driver");
-    return true;
+    return ier;
   }
 
   bool need_dE = ((isComputeForces == true) || (isComputeVirial == true) ||
@@ -322,15 +323,13 @@ int ANNImplementation::Compute(
     modelComputeArguments->GetNeighborList(0, i, &numnei, &n1atom);
 
 
-    double * GC;
-    double ** dGCdr;
+    double * GC=nullptr;
+    double ** dGCdr=nullptr;
     int const Ndescriptors = descriptor_->get_num_descriptors();
     AllocateAndInitialize1DArray<double>(GC, Ndescriptors);
-
     if (need_dE) {
       AllocateAndInitialize2DArray<double>(dGCdr, Ndescriptors, (numnei+1)*DIM);
     }
-
 
     descriptor_->generate_one_atom(i, coordinates, particleSpeciesCodes, n1atom, numnei, GC, dGCdr[0], need_dE);
 
@@ -354,28 +353,82 @@ int ANNImplementation::Compute(
       }
     }
 
+    double E = 0;
+    double * dEdGC = nullptr;
 
-    // NN feed forward
-    int ensemble_index = 0;
-    network_->forward(GC, 1, Ndescriptors, ensemble_index);
 
-    // NN backprop to compute derivative of energy w.r.t generalized coords
-    double * dEdGC = NULL;
-    if (need_dE)
-    {
-      network_->backward();
-      dEdGC = network_->get_grad_input();
+    if (ensemble_size_ == 0 || active_member_id_ == 0) {
+      // fully-connected NN
+
+      network_->set_fully_connected(true);
+      int ensemble_index = 0;  // ignored by in fully-connected mode
+
+      // NN forward
+      network_->forward(GC, 1, Ndescriptors, ensemble_index);
+      E = network_->get_sum_output();
+
+      // NN backprop
+      if (need_dE) {
+        network_->backward();
+        dEdGC = network_->get_grad_input();
+      }
+
+
+    } else if (active_member_id_ > 0 && active_member_id_ <= ensemble_size_) {
+      // a specific member of the ensemble
+
+      network_->set_fully_connected(false);
+      int ensemble_index = active_member_id_ - 1; // internally starts from 0
+
+      // NN forward
+      network_->forward(GC, 1, Ndescriptors, ensemble_index);
+      E = network_->get_sum_output();
+
+      // NN backprop
+      if (need_dE) {
+        network_->backward();
+        dEdGC = network_->get_grad_input();
+      }
+
+
+    } else if (active_member_id_ == -1) {
+      // average over ensemble
+
+      network_->set_fully_connected(false);
+      if (need_dE) {
+        AllocateAndInitialize1DArray<double>(dEdGC, Ndescriptors);
+      }
+
+      for (int iev=0; iev<ensemble_size_; iev++) {
+        // NN forward
+        network_->forward(GC, 1, Ndescriptors, iev);
+        double eng = network_->get_sum_output();
+        E +=eng/ensemble_size_;
+
+        // NN backprop
+        if (need_dE) {
+          network_->backward();
+          double * deng = network_->get_grad_input();
+          for (int idesc=0; idesc<Ndescriptors; idesc++) {
+            dEdGC[idesc] += deng[idesc] / ensemble_size_;
+          }
+        }
+      }
+    } else {
+      char message[MAXLINE];
+      sprintf(message, "`active_member_id=%d` out of range. Should be [-1, %d]",
+          active_member_id_, ensemble_size_);
+      LOG_ERROR(message);
+      return ier;
     }
 
-    double Ei = 0.;
-    if (isComputeEnergy == true || isComputeParticleEnergy == true)
-    { Ei = network_->get_sum_output(); }
+
 
     // Contribution to energy
-    if (isComputeEnergy == true) { *energy += Ei; }
+    if (isComputeEnergy == true) { *energy += E; }
 
     // Contribution to particle energy
-    if (isComputeParticleEnergy == true) { particleEnergy[i] += Ei; }
+    if (isComputeParticleEnergy == true) { particleEnergy[i] += E; }
 
     // Contribution to forces
     if (isComputeForces == true) {
@@ -407,8 +460,15 @@ int ANNImplementation::Compute(
     }
 
 
+    // deallocate memory
     Deallocate1DArray(GC);
-    Deallocate2DArray(dGCdr);
+    if (need_dE) {
+      Deallocate2DArray(dGCdr);
+    }
+    if(active_member_id_ == -1 and need_dE) {
+      Deallocate1DArray(dEdGC);
+    }
+
 
   }  // loop over i
 

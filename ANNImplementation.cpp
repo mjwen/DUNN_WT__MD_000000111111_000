@@ -56,8 +56,8 @@ ANNImplementation::ANNImplementation(
     int * const ier) :
     ensemble_size_(0),
     last_ensemble_size_(0),
-    ensemble_mode_(-1),
-    last_ensemble_mode_(-1),
+    active_member_id_(-1),
+    last_active_member_id_(-1),
     influenceDistance_(0.0),
     modelWillNotRequestNeighborsOfNoncontributingParticles_(1),
     cachedNumberOfParticles_(0)
@@ -355,7 +355,7 @@ int ANNImplementation::ProcessParameterFiles(
     return true;
   }
   ensemble_size_ = last_ensemble_size_= network_->get_ensemble_size();
-  ensemble_mode_ =last_ensemble_mode_= -1;  // default to average the output
+  active_member_id_ =last_active_member_id_= -1;  // default to average the output
 
   // everything is good
   ier = false;
@@ -534,15 +534,15 @@ int ANNImplementation::RegisterKIMParameters(
            "ensemble mode.")
        || modelDriverCreate->SetParameterPointer(
            1,
-           &ensemble_mode_,
-           "ensemble_mode",
+           &active_member_id_,
+           "active_member_id",
            "Running mode of the ensemble of models, with available values of "
            "`-1, 0, 1, 2, ..., ensemble_size`. If `ensemble_size = 0`, "
-           "this is ignored. Otherwise, `ensemble_mode = -1` means the output "
+           "this is ignored. Otherwise, `active_member_id = -1` means the output "
            "(energy, forces, etc.) will be obtained by averaging over all "
            "members of the ensemble (different dropout matrices); "
-           "`ensemble_mode = 0` means the fully-connected network without "
-           "dropout will be used; and `ensemble_mode = i` where i is an "
+           "`active_member_id = 0` means the fully-connected network without "
+           "dropout will be used; and `active_member_id = i` where i is an "
            "integer from 1 to `ensemble_size` means ensemble member i will be "
            "used to calculate the output.");
 
@@ -608,22 +608,22 @@ int ANNImplementation::SetRefreshMutableValues(ModelObj * const modelObj)
   //       modelRefresh object when the Model's parameters have been altered
   int ier = true;
 
-  // ensure "ensemble_size_" is not changed and "ensemble_mode_" is within range
+  // checks to make sure ensemble_size_ and active_member_id_ are correct
   if (ensemble_size_ != last_ensemble_size_) {
     LOG_ERROR("Value of `ensemble_size` changed.");
     return ier;
   }
-  if (ensemble_mode_<-1 || ensemble_mode_>ensemble_size_) {
+  if (active_member_id_<-1 || active_member_id_>ensemble_size_) {
     char message[MAXLINE];
-    sprintf(message, "`ensemble_mode=%d` out of range. Should be [-1, %d]",
-        ensemble_mode_, ensemble_size_);
+    sprintf(message, "`active_member_id=%d` out of range. Should be [-1, %d]",
+        active_member_id_, ensemble_size_);
     LOG_ERROR(message);
     return ier;
   }
-  if ((last_ensemble_size_ == 0) && (ensemble_mode_ != last_ensemble_mode_)) {
-    LOG_INFORMATION("`ensemble_mode`ignored since `ensemble_size=0`.");
+  if ((last_ensemble_size_ == 0) && (active_member_id_ != last_active_member_id_)) {
+    LOG_INFORMATION("`active_member_id`ignored since `ensemble_size=0`.");
   }
-  last_ensemble_mode_ = ensemble_mode_;
+  last_active_member_id_ = active_member_id_;
 
   // update influence distance value in KIM API object
   int Nspecies = descriptor_->get_num_species();
