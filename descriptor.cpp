@@ -566,8 +566,8 @@ void Descriptor::generate_one_atom(const int i,
             for (int dim = 0; dim < DIM; ++dim)
             {
               double pair = dgcdr_two * rij[dim] / rijmag;
-              grad_desc[page + numnei * DIM + dim] += pair;
-              grad_desc[page + jj * DIM + dim] -= pair;
+              grad_desc[page + numnei * DIM + dim] -= pair;
+              grad_desc[page + jj * DIM + dim] += pair;
             }
           }
           idx += 1;
@@ -654,9 +654,9 @@ double const  rcutjk = rcut_2D_[jSpecies][kSpecies];
                 double pair_ij = dgcdr_three[0] * rij[dim] / rijmag;
                 double pair_ik = dgcdr_three[1] * rik[dim] / rikmag;
                 double pair_jk = dgcdr_three[2] * rjk[dim] / rjkmag;
-                grad_desc[page+numnei * DIM + dim] += pair_ij + pair_ik;
-                grad_desc[page+jj * DIM + dim] += -pair_ij + pair_jk;
-                grad_desc[page+kk * DIM + dim] += -pair_ik - pair_jk;
+                grad_desc[page+numnei * DIM + dim] += -pair_ij - pair_ik;
+                grad_desc[page+jj * DIM + dim] += pair_ij - pair_jk;
+                grad_desc[page+kk * DIM + dim] += pair_ik + pair_jk;
               }
             }
             idx += 1;

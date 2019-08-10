@@ -441,25 +441,25 @@ int ANNImplementation::Compute(
             idx = n1atom[k]; // neighbors
           }
           VectorOfSizeDIM f;
-          f[0] = dEdGC[j] * dGCdr[j][k * DIM + 0];
-          f[1] = dEdGC[j] * dGCdr[j][k * DIM + 1];
-          f[2] = dEdGC[j] * dGCdr[j][k * DIM + 2];
+          f[0] = -dEdGC[j] * dGCdr[j][k * DIM + 0];
+          f[1] = -dEdGC[j] * dGCdr[j][k * DIM + 1];
+          f[2] = -dEdGC[j] * dGCdr[j][k * DIM + 2];
 
 
           if (isComputeForces == true) {
-            forces[idx][0] += -f[0];
-            forces[idx][1] += -f[1];
-            forces[idx][2] += -f[2];
+            forces[idx][0] += f[0];
+            forces[idx][1] += f[1];
+            forces[idx][2] += f[2];
           }
 
           if (isComputeParticleVirial == true || isComputeVirial == true) {
             VectorOfSizeSix v;
-            v[0] = f[0]*coordinates[idx][0];
-            v[1] = f[1]*coordinates[idx][1];
-            v[2] = f[2]*coordinates[idx][2];
-            v[3] = f[1]*coordinates[idx][2];
-            v[4] = f[2]*coordinates[idx][0];
-            v[5] = f[0]*coordinates[idx][1];
+            v[0] = -f[0]*coordinates[idx][0];
+            v[1] = -f[1]*coordinates[idx][1];
+            v[2] = -f[2]*coordinates[idx][2];
+            v[3] = -f[1]*coordinates[idx][2];
+            v[4] = -f[2]*coordinates[idx][0];
+            v[5] = -f[0]*coordinates[idx][1];
             if (isComputeParticleVirial == true) {
               particleVirial[idx][0] += v[0];
               particleVirial[idx][1] += v[1];
