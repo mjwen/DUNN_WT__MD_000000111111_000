@@ -70,6 +70,9 @@ class NeuralNetwork
 
   void set_ensemble_size(int repeat);
   int get_ensemble_size();
+
+  void set_fully_connected(bool status);
+
   void add_dropout_binary(int ensemble_index,
                           int layer_index,
                           int size,
@@ -126,13 +129,15 @@ class NeuralNetwork
   int ensemble_size_;
   std::vector<std::vector<RowMatrixXd> > row_binary_;
 
+  bool fully_connected_;
+
   // dropout
   RowMatrixXd
   dropout_(RowMatrixXd const & x, int layer, int const ensemble_index);
 };
 
 
-// activation fucntion and derivatives
+// activation function and derivatives
 RowMatrixXd relu(RowMatrixXd const & x);
 RowMatrixXd relu_derivative(RowMatrixXd const & x);
 RowMatrixXd elu(RowMatrixXd const & x);

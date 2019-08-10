@@ -83,13 +83,14 @@ class ANNImplementation
   //   Memory allocated in AllocatePrivateParameterMemory() (from constructor)
   //   Memory deallocated in destructor
   //   Data set in ReadParameterFile routines
-  // none
+  int ensemble_size_;
+  int last_ensemble_size_;
   //
   // KIM API: Model Parameters whose (pointer) values never change
   //   Memory allocated in AllocateParameterMemory() (from constructor)
   //   Memory deallocated in destructor
   //   Data set in ReadParameterFile routines OR by KIM Simulator
-  // none
+  int ensemble_mode_;
 
   // Mutable values that only change when Refresh() executes
   //   Set in Refresh (via SetRefreshMutableValues)
@@ -99,6 +100,7 @@ class ANNImplementation
   // none
   //
   // ANNImplementation: values (changed only by Refresh())
+  int last_ensemble_mode_;
   double influenceDistance_;
   int modelWillNotRequestNeighborsOfNoncontributingParticles_;
 
@@ -109,7 +111,7 @@ class ANNImplementation
   // ANNImplementation: values that change
   int cachedNumberOfParticles_;
 
-  // descriptor;
+  // descriptor and network
   Descriptor * descriptor_;
   NeuralNetwork * network_;
 
@@ -326,25 +328,11 @@ int ANNImplementation::Compute(
     AllocateAndInitialize1DArray<double>(GC, Ndescriptors);
 
     if (need_dE) {
-    AllocateAndInitialize2DArray<double>(dGCdr, Ndescriptors, (numnei+1)*DIM);
-  }
+      AllocateAndInitialize2DArray<double>(dGCdr, Ndescriptors, (numnei+1)*DIM);
+    }
 
 
-
-  descriptor_->generate_one_atom(i,
-                                     coordinates,
-                                         particleSpeciesCodes,
-                                         n1atom,
-                                         numnei,
-                                         GC,
-              reinterpret_cast <double *> (dGCdr),
-                                         need_dE);
-
-
-
-
-
-
+    descriptor_->generate_one_atom(i, coordinates, particleSpeciesCodes, n1atom, numnei, GC, dGCdr[0], need_dE);
 
 
     // centering and normalization
@@ -356,31 +344,14 @@ int ANNImplementation::Compute(
         double std;
         descriptor_->get_feature_mean_and_std(t, mean, std);
         GC[t] = (GC[t] - mean) / std;
+
+        if (need_dE) {
+          for (int s = 0; s < (numnei+1)*DIM; s++) {
+            dGCdr[t][s] /= std;
+          }
+        }
+
       }
-
-      // Done below when computing forces
-      //      if (need_dE)
-      //      {
-      //        for (int s = 0; s < Npairs_two; s++)
-      //        {
-      //          for (int t = 0; t < Ndescriptors_two; t++)
-      //          {
-      //            int desc_idx = map_t_desc_two[t];
-      //            dGCdr_two[s][t] /= descriptor_->feature_std_[desc_idx];
-      //          }
-      //        }
-
-      //        for (int s = 0; s < Npairs_three; s++)
-      //        {
-      //          for (int t = 0; t < Ndescriptors_three; t++)
-      //          {
-      //            int desc_idx = map_t_desc_three[t];
-      //            dGCdr_three[s][t][0] /= descriptor_->feature_std_[desc_idx];
-      //            dGCdr_three[s][t][1] /= descriptor_->feature_std_[desc_idx];
-      //            dGCdr_three[s][t][2] /= descriptor_->feature_std_[desc_idx];
-      //          }
-      //        }
-      //      }
     }
 
 

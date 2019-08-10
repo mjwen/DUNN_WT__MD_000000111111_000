@@ -32,7 +32,12 @@
 
 
 // Nothing to do at this moment
-NeuralNetwork::NeuralNetwork() : ensemble_size_(0) {}
+NeuralNetwork::NeuralNetwork() :
+  ensemble_size_(0),
+  fully_connected_(false)
+{
+  return;
+}
 
 NeuralNetwork::~NeuralNetwork() {}
 
@@ -305,7 +310,15 @@ void NeuralNetwork::set_ensemble_size(int repeat)
   { row_binary_[i].resize(Nlayers_); }
 }
 
-int NeuralNetwork::get_ensemble_size() { return ensemble_size_; }
+int NeuralNetwork::get_ensemble_size() {
+  return ensemble_size_;
+}
+
+
+void NeuralNetwork::set_fully_connected(bool status)
+{
+  fully_connected_ = status;
+}
 
 
 void NeuralNetwork::add_dropout_binary(int ensemble_index,
@@ -334,7 +347,7 @@ void NeuralNetwork::forward(double * zeta,
   for (int i = 0; i < Nlayers_; i++)
   {
     // apply dropout
-    if (keep_prob_[i] < 1 - 1e-10)
+    if (fully_connected_ ==false && keep_prob_[i] < 1 - 1e-10)
     {
       act = dropout_(act, i, ensemble_index);  // no aliasing will occur for act
     }
@@ -365,28 +378,20 @@ void NeuralNetwork::backward()
   for (int i = Nlayers_ - 2; i >= 0; i--)
   {
     // eval() is used to prevent aliasing since delta is both lvalue and rvalue.
-    delta = (delta * weights_[i + 1].transpose())
-      .eval()
-      .cwiseProduct(activFuncDeriv_(preactiv_[i]));
+    delta = (delta * weights_[i + 1].transpose()) .eval() .cwiseProduct(activFuncDeriv_(preactiv_[i]));
 
     // apply dropout
-    if (keep_prob_[i + 1] < 1 - 1e-10)
+    if (fully_connected_ ==false && keep_prob_[i + 1] < 1 - 1e-10)
     {
-      delta = delta.cwiseProduct(keep_prob_binary_[i + 1])
-        / keep_prob_[i + 1];  // no aliasing will occur
+      delta = delta.cwiseProduct(keep_prob_binary_[i + 1]) / keep_prob_[i + 1];
     }
   }
 
-  // derivative of cost (energy E) w.r.t to input (generalized coords)
-  if (keep_prob_[0] < 1 - 1e-10)
+  gradInput_ = delta * weights_[0].transpose();
+  // apply dropout
+  if (fully_connected_ ==false && keep_prob_[0] < 1 - 1e-10)
   {
-    gradInput_
-      = (delta * weights_[0].transpose()).cwiseProduct(keep_prob_binary_[0])
-      / keep_prob_[0];
-  }
-  else
-  {
-    gradInput_ = delta * weights_[0].transpose();
+    gradInput_ = gradInput_.cwiseProduct(keep_prob_binary_[0]) / keep_prob_[0];
   }
 }
 
@@ -399,17 +404,19 @@ RowMatrixXd NeuralNetwork::dropout_(RowMatrixXd const & x,
   RowMatrixXd y;
   double keep_prob = keep_prob_[layer];
 
-  if (keep_prob < 1 - 1e-10)
+  if (fully_connected_ ==false && keep_prob < 1 - 1e-10)
   {
-    // uniform [-1, 1]
+    //// do it within model
+    //// uniform [-1, 1]
     // RowMatrixXd random = RowMatrixXd::Random(1, x.cols());
-    // uniform [keep_prob, 1+keep_prob] .floor()
+    //// uniform [keep_prob, 1+keep_prob] .floor()
     // random =( (random/2.).array() + 0.5 + keep_prob ).floor();
 
+    // read in from file
     RowMatrixXd random = row_binary_[ensemble_index][layer];
 
-    keep_prob_binary_[layer] = random.replicate(
-        x.rows(), 1);  // each row is the same (each atom is treated the same)
+    // each row is the same (each atom is treated the same)
+    keep_prob_binary_[layer] = random.replicate(x.rows(), 1);
 
     // TODO delete  This is for debug pourpose, should be used together with
     // `openkim-fit/tests/test_ann_force_dropout.py`

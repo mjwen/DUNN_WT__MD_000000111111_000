@@ -54,6 +54,10 @@ ANNImplementation::ANNImplementation(
     KIM::TemperatureUnit const requestedTemperatureUnit,
     KIM::TimeUnit const requestedTimeUnit,
     int * const ier) :
+    ensemble_size_(0),
+    last_ensemble_size_(0),
+    ensemble_mode_(-1),
+    last_ensemble_mode_(-1),
     influenceDistance_(0.0),
     modelWillNotRequestNeighborsOfNoncontributingParticles_(1),
     cachedNumberOfParticles_(0)
@@ -89,11 +93,8 @@ ANNImplementation::ANNImplementation(
   *ier = RegisterKIMModelSettings(modelDriverCreate);
   if (*ier) { return; }
 
-  // Do not publish parameters
-  //  *ier = RegisterKIMParameters(modelDriverCreate);
-  //  if (*ier) {
-  //    return;
-  //  }
+  *ier = RegisterKIMParameters(modelDriverCreate);
+  if (*ier) { return; }
 
   *ier = RegisterKIMFunctions(modelDriverCreate);
   if (*ier) { return; }
@@ -353,7 +354,8 @@ int ANNImplementation::ProcessParameterFiles(
     LOG_ERROR(errorMsg);
     return true;
   }
-
+  ensemble_size_ = last_ensemble_size_= network_->get_ensemble_size();
+  ensemble_mode_ =last_ensemble_mode_= -1;  // default to average the output
 
   // everything is good
   ier = false;
@@ -514,23 +516,47 @@ int ANNImplementation::RegisterKIMComputeArgumentsSettings(
 
 
 //******************************************************************************
-// helper macro
-#define SNUM(x) \
-  static_cast<std::ostringstream &>(std::ostringstream() << std::dec << x).str()
-
 #undef KIM_LOGGER_OBJECT_NAME
 #define KIM_LOGGER_OBJECT_NAME modelDriverCreate
 int ANNImplementation::RegisterKIMParameters(
     KIM::ModelDriverCreate * const modelDriverCreate)
 {
-  (void) modelDriverCreate;  // avoid not used warning
-  // Do not support the publish of parameters
+
+  int ier = false;
+
+  // publish parameters (order is important)
+  ier = modelDriverCreate->SetParameterPointer(
+           1,
+           &ensemble_size_,
+           "ensemble_size",
+           "Size of the ensemble of models. `0` means this is a fully-"
+           "connected neural network that does not support running in "
+           "ensemble mode.")
+       || modelDriverCreate->SetParameterPointer(
+           1,
+           &ensemble_mode_,
+           "ensemble_mode",
+           "Running mode of the ensemble of models, with available values of "
+           "`-1, 0, 1, 2, ..., ensemble_size`. If `ensemble_size = 0`, "
+           "this is ignored. Otherwise, `ensemble_mode = -1` means the output "
+           "(energy, forces, etc.) will be obtained by averaging over all "
+           "members of the ensemble (different dropout matrices); "
+           "`ensemble_mode = 0` means the fully-connected network without "
+           "dropout will be used; and `ensemble_mode = i` where i is an "
+           "integer from 1 to `ensemble_size` means ensemble member i will be "
+           "used to calculate the output.");
+
+ if (ier)
+   {
+     LOG_ERROR("set_parameters");
+     return ier;
+   }
+
 
   // everything is good
-  int ier = false;
+  ier = false;
   return ier;
 }
-
 
 //******************************************************************************
 int ANNImplementation::RegisterKIMFunctions(
@@ -545,11 +571,11 @@ int ANNImplementation::RegisterKIMFunctions(
               KIM::LANGUAGE_NAME::cpp,
               true,
               reinterpret_cast<KIM::Function *>(ANN::Destroy))
-          //          || modelDriverCreate->SetRoutinePointer(
-          //              KIM::MODEL_ROUTINE_NAME::Refresh,
-          //              KIM::LANGUAGE_NAME::cpp,
-          //              true,
-          //              reinterpret_cast<KIM::Function *>(ANN::Refresh))
+                    || modelDriverCreate->SetRoutinePointer(
+                        KIM::MODEL_ROUTINE_NAME::Refresh,
+                        KIM::LANGUAGE_NAME::cpp,
+                        true,
+                        reinterpret_cast<KIM::Function *>(ANN::Refresh))
           || modelDriverCreate->SetRoutinePointer(
               KIM::MODEL_ROUTINE_NAME::Compute,
               KIM::LANGUAGE_NAME::cpp,
@@ -571,6 +597,8 @@ int ANNImplementation::RegisterKIMFunctions(
 
 
 //******************************************************************************
+#undef KIM_LOGGER_OBJECT_NAME
+#define KIM_LOGGER_OBJECT_NAME modelObj
 template<class ModelObj>
 int ANNImplementation::SetRefreshMutableValues(ModelObj * const modelObj)
 {  // use (possibly) new values of parameters to
@@ -578,9 +606,26 @@ int ANNImplementation::SetRefreshMutableValues(ModelObj * const modelObj)
   // NOTE: This function is templated because it's called with both a
   //       modelDriverCreate object during initialization and with a
   //       modelRefresh object when the Model's parameters have been altered
-  int ier;
+  int ier = true;
 
-  // update cutoff value in KIM API object
+  // ensure "ensemble_size_" is not changed and "ensemble_mode_" is within range
+  if (ensemble_size_ != last_ensemble_size_) {
+    LOG_ERROR("Value of `ensemble_size` changed.");
+    return ier;
+  }
+  if (ensemble_mode_<-1 || ensemble_mode_>ensemble_size_) {
+    char message[MAXLINE];
+    sprintf(message, "`ensemble_mode=%d` out of range. Should be [-1, %d]",
+        ensemble_mode_, ensemble_size_);
+    LOG_ERROR(message);
+    return ier;
+  }
+  if ((last_ensemble_size_ == 0) && (ensemble_mode_ != last_ensemble_mode_)) {
+    LOG_INFORMATION("`ensemble_mode`ignored since `ensemble_size=0`.");
+  }
+  last_ensemble_mode_ = ensemble_mode_;
+
+  // update influence distance value in KIM API object
   int Nspecies = descriptor_->get_num_species();
   influenceDistance_ = 0.0;
   for (int i = 0; i < Nspecies; i++) {
