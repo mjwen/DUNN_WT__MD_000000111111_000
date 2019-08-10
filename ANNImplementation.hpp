@@ -171,7 +171,7 @@ class ANNImplementation
       VectorOfSizeDIM *& forces,
       double *& particleEnergy,
       VectorOfSizeSix *& virial,
-      VectorOfSizeSix *& particleViral);
+      VectorOfSizeSix *& particleVirial);
   int CheckParticleSpeciesCodes(KIM::ModelCompute const * const modelCompute,
                                 int const * const particleSpeciesCodes) const;
   int GetComputeIndex(const bool & isComputeProcess_dEdr,
@@ -337,16 +337,16 @@ int ANNImplementation::Compute(
     // centering and normalization
     if (descriptor_->need_normalize())
     {
-      for (int t = 0; t < Ndescriptors; t++)
+      for (int j = 0; j < Ndescriptors; j++)
       {
         double mean;
         double std;
-        descriptor_->get_feature_mean_and_std(t, mean, std);
-        GC[t] = (GC[t] - mean) / std;
+        descriptor_->get_feature_mean_and_std(j, mean, std);
+        GC[j] = (GC[j] - mean) / std;
 
         if (need_dE) {
-          for (int s = 0; s < (numnei+1)*DIM; s++) {
-            dGCdr[t][s] /= std;
+          for (int k = 0; k < (numnei+1)*DIM; k++) {
+            dGCdr[j][k] /= std;
           }
         }
 
@@ -356,7 +356,7 @@ int ANNImplementation::Compute(
     double E = 0;
     double * dEdGC = nullptr;
 
-
+    // select a specific running mode
     if (ensemble_size_ == 0 || active_member_id_ == 0) {
       // fully-connected NN
 
@@ -372,7 +372,6 @@ int ANNImplementation::Compute(
         network_->backward();
         dEdGC = network_->get_grad_input();
       }
-
 
     } else if (active_member_id_ > 0 && active_member_id_ <= ensemble_size_) {
       // a specific member of the ensemble
@@ -409,8 +408,8 @@ int ANNImplementation::Compute(
         if (need_dE) {
           network_->backward();
           double * deng = network_->get_grad_input();
-          for (int idesc=0; idesc<Ndescriptors; idesc++) {
-            dEdGC[idesc] += deng[idesc] / ensemble_size_;
+          for (int j=0; j<Ndescriptors; j++) {
+            dEdGC[j] += deng[j] / ensemble_size_;
           }
         }
       }
@@ -423,16 +422,15 @@ int ANNImplementation::Compute(
     }
 
 
-
     // Contribution to energy
     if (isComputeEnergy == true) { *energy += E; }
 
     // Contribution to particle energy
     if (isComputeParticleEnergy == true) { particleEnergy[i] += E; }
 
-    // Contribution to forces
-    if (isComputeForces == true) {
-      // atom i itself
+    // Contribution to forces, particle virial, and virial
+    if (need_dE == true) {
+
       for (int j = 0; j < Ndescriptors; j++) {
         for (int k = 0; k < numnei+1; k++) {
           int idx ;
@@ -442,23 +440,48 @@ int ANNImplementation::Compute(
           else {
             idx = n1atom[k]; // neighbors
           }
-          for (int dim = 0; dim < DIM; dim++) {
-            forces[idx][dim] += dEdGC[j] * dGCdr[j][k * DIM + dim];
+          VectorOfSizeDIM f;
+          f[0] = dEdGC[j] * dGCdr[j][k * DIM + 0];
+          f[1] = dEdGC[j] * dGCdr[j][k * DIM + 1];
+          f[2] = dEdGC[j] * dGCdr[j][k * DIM + 2];
+
+
+          if (isComputeForces == true) {
+            forces[idx][0] += -f[0];
+            forces[idx][1] += -f[1];
+            forces[idx][2] += -f[2];
           }
+
+          if (isComputeParticleVirial == true || isComputeVirial == true) {
+            VectorOfSizeSix v;
+            v[0] = f[0]*coordinates[idx][0];
+            v[1] = f[1]*coordinates[idx][1];
+            v[2] = f[2]*coordinates[idx][2];
+            v[3] = f[1]*coordinates[idx][2];
+            v[4] = f[2]*coordinates[idx][0];
+            v[5] = f[0]*coordinates[idx][1];
+            if (isComputeParticleVirial == true) {
+              particleVirial[idx][0] += v[0];
+              particleVirial[idx][1] += v[1];
+              particleVirial[idx][2] += v[2];
+              particleVirial[idx][3] += v[3];
+              particleVirial[idx][4] += v[4];
+              particleVirial[idx][5] += v[5];
+            }
+            if (isComputeVirial == true) {
+              virial[0] += v[0];
+              virial[1] += v[1];
+              virial[2] += v[2];
+              virial[3] += v[3];
+              virial[4] += v[4];
+              virial[5] += v[5];
+            }
+          }
+
         }
+
       }
     }
-
-    // Contribution to virial
-    if (isComputeVirial == true) {
-      //TODO
-    }
-
-    // Contribution to particleVirial
-    if (isComputeParticleVirial == true) {
-      //TODO
-    }
-
 
     // deallocate memory
     Deallocate1DArray(GC);
@@ -469,8 +492,8 @@ int ANNImplementation::Compute(
       Deallocate1DArray(dEdGC);
     }
 
-
   }  // loop over i
+
 
 
   // everything is good
