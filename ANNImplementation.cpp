@@ -46,63 +46,57 @@
 #undef KIM_LOGGER_OBJECT_NAME
 #define KIM_LOGGER_OBJECT_NAME modelDriverCreate
 ANNImplementation::ANNImplementation(
-    KIM::ModelDriverCreate *const modelDriverCreate,
+    KIM::ModelDriverCreate * const modelDriverCreate,
     KIM::LengthUnit const requestedLengthUnit,
     KIM::EnergyUnit const requestedEnergyUnit,
     KIM::ChargeUnit const requestedChargeUnit,
     KIM::TemperatureUnit const requestedTemperatureUnit,
-    KIM::TimeUnit const requestedTimeUnit, int *const ier)
-    : ensemble_size_(0), last_ensemble_size_(0), active_member_id_(-1),
-      last_active_member_id_(-1), influenceDistance_(0.0),
-      modelWillNotRequestNeighborsOfNoncontributingParticles_(1),
-      cachedNumberOfParticles_(0) {
+    KIM::TimeUnit const requestedTimeUnit,
+    int * const ier) :
+    ensemble_size_(0),
+    last_ensemble_size_(0),
+    active_member_id_(-1),
+    last_active_member_id_(-1),
+    influenceDistance_(0.0),
+    modelWillNotRequestNeighborsOfNoncontributingParticles_(1),
+    cachedNumberOfParticles_(0)
+{
   // create descriptor and network classes
   descriptor_ = new Descriptor();
   network_ = new NeuralNetwork();
 
-  FILE *parameterFilePointers[MAX_PARAMETER_FILES];
+  FILE * parameterFilePointers[MAX_PARAMETER_FILES];
   int numberParameterFiles;
 
   modelDriverCreate->GetNumberOfParameterFiles(&numberParameterFiles);
-  *ier = OpenParameterFiles(modelDriverCreate, numberParameterFiles,
-                            parameterFilePointers);
-  if (*ier) {
-    return;
-  }
+  *ier = OpenParameterFiles(
+      modelDriverCreate, numberParameterFiles, parameterFilePointers);
+  if (*ier) { return; }
 
-  *ier = ProcessParameterFiles(modelDriverCreate, numberParameterFiles,
-                               parameterFilePointers);
+  *ier = ProcessParameterFiles(
+      modelDriverCreate, numberParameterFiles, parameterFilePointers);
   CloseParameterFiles(numberParameterFiles, parameterFilePointers);
-  if (*ier) {
-    return;
-  }
+  if (*ier) { return; }
 
-  *ier = ConvertUnits(modelDriverCreate, requestedLengthUnit,
-                      requestedEnergyUnit, requestedChargeUnit,
-                      requestedTemperatureUnit, requestedTimeUnit);
-  if (*ier) {
-    return;
-  }
+  *ier = ConvertUnits(modelDriverCreate,
+                      requestedLengthUnit,
+                      requestedEnergyUnit,
+                      requestedChargeUnit,
+                      requestedTemperatureUnit,
+                      requestedTimeUnit);
+  if (*ier) { return; }
 
   *ier = SetRefreshMutableValues(modelDriverCreate);
-  if (*ier) {
-    return;
-  }
+  if (*ier) { return; }
 
   *ier = RegisterKIMModelSettings(modelDriverCreate);
-  if (*ier) {
-    return;
-  }
+  if (*ier) { return; }
 
   *ier = RegisterKIMParameters(modelDriverCreate);
-  if (*ier) {
-    return;
-  }
+  if (*ier) { return; }
 
   *ier = RegisterKIMFunctions(modelDriverCreate);
-  if (*ier) {
-    return;
-  }
+  if (*ier) { return; }
 
   // everything is good
   *ier = false;
@@ -110,8 +104,9 @@ ANNImplementation::ANNImplementation(
 }
 
 //******************************************************************************
-ANNImplementation::~ANNImplementation() { // note: it is ok to delete a null
-                                          // pointer and we have ensured that
+ANNImplementation::~ANNImplementation()
+{  // note: it is ok to delete a null
+   // pointer and we have ensured that
   // everything is initialized to null
 
   delete descriptor_;
@@ -121,13 +116,12 @@ ANNImplementation::~ANNImplementation() { // note: it is ok to delete a null
 //******************************************************************************
 #undef KIM_LOGGER_OBJECT_NAME
 #define KIM_LOGGER_OBJECT_NAME modelRefresh
-int ANNImplementation::Refresh(KIM::ModelRefresh *const modelRefresh) {
+int ANNImplementation::Refresh(KIM::ModelRefresh * const modelRefresh)
+{
   int ier;
 
   ier = SetRefreshMutableValues(modelRefresh);
-  if (ier) {
-    return ier;
-  }
+  if (ier) { return ier; }
 
   // nothing else to do for this case
 
@@ -138,8 +132,9 @@ int ANNImplementation::Refresh(KIM::ModelRefresh *const modelRefresh) {
 
 //******************************************************************************
 int ANNImplementation::Compute(
-    KIM::ModelCompute const *const modelCompute,
-    KIM::ModelComputeArguments const *const modelComputeArguments) {
+    KIM::ModelCompute const * const modelCompute,
+    KIM::ModelComputeArguments const * const modelComputeArguments)
+{
   int ier;
 
   // KIM API Model Input compute flags
@@ -154,26 +149,34 @@ int ANNImplementation::Compute(
   bool isComputeParticleVirial = false;
   //
   // KIM API Model Input
-  int const *particleSpeciesCodes = NULL;
-  int const *particleContributing = NULL;
-  VectorOfSizeDIM const *coordinates = NULL;
+  int const * particleSpeciesCodes = NULL;
+  int const * particleContributing = NULL;
+  VectorOfSizeDIM const * coordinates = NULL;
   //
   // KIM API Model Output
-  double *energy = NULL;
-  double *particleEnergy = NULL;
-  VectorOfSizeDIM *forces = NULL;
-  VectorOfSizeSix *virial = NULL;
-  VectorOfSizeSix *particleVirial = NULL;
+  double * energy = NULL;
+  double * particleEnergy = NULL;
+  VectorOfSizeDIM * forces = NULL;
+  VectorOfSizeSix * virial = NULL;
+  VectorOfSizeSix * particleVirial = NULL;
 
-  ier = SetComputeMutableValues(
-      modelComputeArguments, isComputeProcess_dEdr, isComputeProcess_d2Edr2,
-      isComputeEnergy, isComputeForces, isComputeParticleEnergy,
-      isComputeVirial, isComputeParticleVirial, particleSpeciesCodes,
-      particleContributing, coordinates, energy, forces, particleEnergy, virial,
-      particleVirial);
-  if (ier) {
-    return ier;
-  }
+  ier = SetComputeMutableValues(modelComputeArguments,
+                                isComputeProcess_dEdr,
+                                isComputeProcess_d2Edr2,
+                                isComputeEnergy,
+                                isComputeForces,
+                                isComputeParticleEnergy,
+                                isComputeVirial,
+                                isComputeParticleVirial,
+                                particleSpeciesCodes,
+                                particleContributing,
+                                coordinates,
+                                energy,
+                                forces,
+                                particleEnergy,
+                                virial,
+                                particleVirial);
+  if (ier) { return ier; }
 
   // Skip this check for efficiency
   //
@@ -187,13 +190,12 @@ int ANNImplementation::Compute(
 
 //******************************************************************************
 int ANNImplementation::ComputeArgumentsCreate(
-    KIM::ModelComputeArgumentsCreate *const modelComputeArgumentsCreate) const {
+    KIM::ModelComputeArgumentsCreate * const modelComputeArgumentsCreate) const
+{
   int ier;
 
   ier = RegisterKIMComputeArgumentsSettings(modelComputeArgumentsCreate);
-  if (ier) {
-    return ier;
-  }
+  if (ier) { return ier; }
 
   // nothing else to do for this case
 
@@ -204,11 +206,12 @@ int ANNImplementation::ComputeArgumentsCreate(
 
 //******************************************************************************
 int ANNImplementation::ComputeArgumentsDestroy(
-    KIM::ModelComputeArgumentsDestroy *const modelComputeArgumentsDestroy)
-    const {
+    KIM::ModelComputeArgumentsDestroy * const modelComputeArgumentsDestroy)
+    const
+{
   int ier;
 
-  (void)modelComputeArgumentsDestroy; // avoid not used warning
+  (void) modelComputeArgumentsDestroy;  // avoid not used warning
 
   // nothing else to do for this case
 
@@ -224,12 +227,14 @@ int ANNImplementation::ComputeArgumentsDestroy(
 //==============================================================================
 
 //******************************************************************************
-void ANNImplementation::AllocatePrivateParameterMemory() {
+void ANNImplementation::AllocatePrivateParameterMemory()
+{
   // nothing to do for this case
 }
 
 //******************************************************************************
-void ANNImplementation::AllocateParameterMemory() {
+void ANNImplementation::AllocateParameterMemory()
+{
   // nothing to do for this case
 }
 
@@ -237,34 +242,37 @@ void ANNImplementation::AllocateParameterMemory() {
 #undef KIM_LOGGER_OBJECT_NAME
 #define KIM_LOGGER_OBJECT_NAME modelDriverCreate
 int ANNImplementation::OpenParameterFiles(
-    KIM::ModelDriverCreate *const modelDriverCreate,
+    KIM::ModelDriverCreate * const modelDriverCreate,
     int const numberParameterFiles,
-    FILE *parameterFilePointers[MAX_PARAMETER_FILES]) {
+    FILE * parameterFilePointers[MAX_PARAMETER_FILES])
+{
   int ier;
 
-  if (numberParameterFiles > MAX_PARAMETER_FILES) {
+  if (numberParameterFiles > MAX_PARAMETER_FILES)
+  {
     ier = true;
     LOG_ERROR("ANN given too many parameter files");
     return ier;
   }
 
-  for (int i = 0; i < numberParameterFiles; ++i) {
-    std::string const *paramFileName;
+  for (int i = 0; i < numberParameterFiles; ++i)
+  {
+    std::string const * paramFileName;
     ier = modelDriverCreate->GetParameterFileName(i, &paramFileName);
-    if (ier) {
+    if (ier)
+    {
       LOG_ERROR("Unable to get parameter file name");
       return ier;
     }
 
     parameterFilePointers[i] = fopen(paramFileName->c_str(), "r");
-    if (parameterFilePointers[i] == 0) {
+    if (parameterFilePointers[i] == 0)
+    {
       char message[MAXLINE];
       sprintf(message, "ANN parameter file number %d cannot be opened", i);
       ier = true;
       LOG_ERROR(message);
-      for (int j = i - 1; i <= 0; --i) {
-        fclose(parameterFilePointers[j]);
-      }
+      for (int j = i - 1; i <= 0; --i) { fclose(parameterFilePointers[j]); }
       return ier;
     }
   }
@@ -278,10 +286,11 @@ int ANNImplementation::OpenParameterFiles(
 #undef KIM_LOGGER_OBJECT_NAME
 #define KIM_LOGGER_OBJECT_NAME modelDriverCreate
 int ANNImplementation::ProcessParameterFiles(
-    KIM::ModelDriverCreate *const modelDriverCreate,
+    KIM::ModelDriverCreate * const modelDriverCreate,
     int const numberParameterFiles,
-    FILE *const parameterFilePointers[MAX_PARAMETER_FILES]) {
-  (void)numberParameterFiles; // avoid not used warning
+    FILE * const parameterFilePointers[MAX_PARAMETER_FILES])
+{
+  (void) numberParameterFiles;  // avoid not used warning
 
   int ier;
   char errorMsg[1024];
@@ -290,7 +299,8 @@ int ANNImplementation::ProcessParameterFiles(
   // descriptor params
   //#######################
   ier = descriptor_->read_parameter_file(parameterFilePointers[0]);
-  if (ier) {
+  if (ier)
+  {
     sprintf(errorMsg, "unable to read descriptor parameter file\n");
     LOG_ERROR(errorMsg);
     return true;
@@ -300,17 +310,17 @@ int ANNImplementation::ProcessParameterFiles(
   int Nspecies = descriptor_->get_num_species();
   std::vector<std::string> species;
   descriptor_->get_species(species);
-  for (int i = 0; i < Nspecies; i++) {
+  for (int i = 0; i < Nspecies; i++)
+  {
     KIM::SpeciesName const specName(species[i]);
-    if (!specName.Known()) {
+    if (!specName.Known())
+    {
       sprintf(errorMsg, "get unknown species\n");
       LOG_ERROR(errorMsg);
       return true;
     }
     ier = modelDriverCreate->SetSpeciesCode(specName, i);
-    if (ier) {
-      return ier;
-    }
+    if (ier) { return ier; }
   }
 
   //#######################
@@ -319,7 +329,8 @@ int ANNImplementation::ProcessParameterFiles(
 
   int desc_size = descriptor_->get_num_descriptors();
   ier = network_->read_parameter_file(parameterFilePointers[1], desc_size);
-  if (ier) {
+  if (ier)
+  {
     sprintf(errorMsg, "unable to read neural network parameter file\n");
     LOG_ERROR(errorMsg);
     return true;
@@ -329,14 +340,15 @@ int ANNImplementation::ProcessParameterFiles(
   // read dropout binary
   //#######################
   ier = network_->read_dropout_file(parameterFilePointers[2]);
-  if (ier) {
+  if (ier)
+  {
     sprintf(errorMsg, "unable to read dropout file\n");
     LOG_ERROR(errorMsg);
     return true;
   }
   ensemble_size_ = last_ensemble_size_ = network_->get_ensemble_size();
-  active_member_id_ = last_active_member_id_ =
-      -1; // default to average the output
+  active_member_id_ = last_active_member_id_
+      = -1;  // default to average the output
 
   // everything is good
   ier = false;
@@ -346,22 +358,23 @@ int ANNImplementation::ProcessParameterFiles(
 //******************************************************************************
 void ANNImplementation::CloseParameterFiles(
     int const numberParameterFiles,
-    FILE *const parameterFilePointers[MAX_PARAMETER_FILES]) {
-  for (int i = 0; i < numberParameterFiles; ++i) {
-    fclose(parameterFilePointers[i]);
-  }
+    FILE * const parameterFilePointers[MAX_PARAMETER_FILES])
+{
+  for (int i = 0; i < numberParameterFiles; ++i)
+  { fclose(parameterFilePointers[i]); }
 }
 
 //******************************************************************************
 #undef KIM_LOGGER_OBJECT_NAME
 #define KIM_LOGGER_OBJECT_NAME modelDriverCreate
 int ANNImplementation::ConvertUnits(
-    KIM::ModelDriverCreate *const modelDriverCreate,
+    KIM::ModelDriverCreate * const modelDriverCreate,
     KIM::LengthUnit const requestedLengthUnit,
     KIM::EnergyUnit const requestedEnergyUnit,
     KIM::ChargeUnit const requestedChargeUnit,
     KIM::TemperatureUnit const requestedTemperatureUnit,
-    KIM::TimeUnit const requestedTimeUnit) {
+    KIM::TimeUnit const requestedTimeUnit)
+{
   int ier;
 
   // define default base units
@@ -374,39 +387,64 @@ int ANNImplementation::ConvertUnits(
   // changing units of sigma, gamma, and cutoff
   double convertLength = 1.0;
 
-  ier = modelDriverCreate->ConvertUnit(
-      fromLength, fromEnergy, fromCharge, fromTemperature, fromTime,
-      requestedLengthUnit, requestedEnergyUnit, requestedChargeUnit,
-      requestedTemperatureUnit, requestedTimeUnit, 1.0, 0.0, 0.0, 0.0, 0.0,
-      &convertLength);
-  if (ier) {
+  ier = modelDriverCreate->ConvertUnit(fromLength,
+                                       fromEnergy,
+                                       fromCharge,
+                                       fromTemperature,
+                                       fromTime,
+                                       requestedLengthUnit,
+                                       requestedEnergyUnit,
+                                       requestedChargeUnit,
+                                       requestedTemperatureUnit,
+                                       requestedTimeUnit,
+                                       1.0,
+                                       0.0,
+                                       0.0,
+                                       0.0,
+                                       0.0,
+                                       &convertLength);
+  if (ier)
+  {
     LOG_ERROR("Unable to convert length unit");
     return ier;
   }
   // convert to active units
-  if (convertLength != ONE) {
-  }
+  if (convertLength != ONE) {}
 
   // changing units of A and lambda
   double convertEnergy = 1.0;
-  ier = modelDriverCreate->ConvertUnit(
-      fromLength, fromEnergy, fromCharge, fromTemperature, fromTime,
-      requestedLengthUnit, requestedEnergyUnit, requestedChargeUnit,
-      requestedTemperatureUnit, requestedTimeUnit, 0.0, 1.0, 0.0, 0.0, 0.0,
-      &convertEnergy);
-  if (ier) {
+  ier = modelDriverCreate->ConvertUnit(fromLength,
+                                       fromEnergy,
+                                       fromCharge,
+                                       fromTemperature,
+                                       fromTime,
+                                       requestedLengthUnit,
+                                       requestedEnergyUnit,
+                                       requestedChargeUnit,
+                                       requestedTemperatureUnit,
+                                       requestedTimeUnit,
+                                       0.0,
+                                       1.0,
+                                       0.0,
+                                       0.0,
+                                       0.0,
+                                       &convertEnergy);
+  if (ier)
+  {
     LOG_ERROR("Unable to convert energy unit");
     return ier;
   }
   // convert to active units
-  if (convertEnergy != ONE) {
-  }
+  if (convertEnergy != ONE) {}
 
   // register units
-  ier = modelDriverCreate->SetUnits(
-      requestedLengthUnit, requestedEnergyUnit, KIM::CHARGE_UNIT::unused,
-      KIM::TEMPERATURE_UNIT::unused, KIM::TIME_UNIT::unused);
-  if (ier) {
+  ier = modelDriverCreate->SetUnits(requestedLengthUnit,
+                                    requestedEnergyUnit,
+                                    KIM::CHARGE_UNIT::unused,
+                                    KIM::TEMPERATURE_UNIT::unused,
+                                    KIM::TIME_UNIT::unused);
+  if (ier)
+  {
     LOG_ERROR("Unable to set units to requested values");
     return ier;
   }
@@ -418,7 +456,8 @@ int ANNImplementation::ConvertUnits(
 
 //******************************************************************************
 int ANNImplementation::RegisterKIMModelSettings(
-    KIM::ModelDriverCreate *const modelDriverCreate) const {
+    KIM::ModelDriverCreate * const modelDriverCreate) const
+{
   // register numbering
   int error = modelDriverCreate->SetModelNumbering(KIM::NUMBERING::zeroBased);
 
@@ -429,33 +468,34 @@ int ANNImplementation::RegisterKIMModelSettings(
 #undef KIM_LOGGER_OBJECT_NAME
 #define KIM_LOGGER_OBJECT_NAME modelComputeArgumentsCreate
 int ANNImplementation::RegisterKIMComputeArgumentsSettings(
-    KIM::ModelComputeArgumentsCreate *const modelComputeArgumentsCreate) const {
+    KIM::ModelComputeArgumentsCreate * const modelComputeArgumentsCreate) const
+{
   // register arguments
   LOG_INFORMATION("Register argument supportStatus");
 
   int error = modelComputeArgumentsCreate->SetArgumentSupportStatus(
                   KIM::COMPUTE_ARGUMENT_NAME::partialEnergy,
-                  KIM::SUPPORT_STATUS::optional) ||
-              modelComputeArgumentsCreate->SetArgumentSupportStatus(
+                  KIM::SUPPORT_STATUS::optional)
+              || modelComputeArgumentsCreate->SetArgumentSupportStatus(
                   KIM::COMPUTE_ARGUMENT_NAME::partialForces,
-                  KIM::SUPPORT_STATUS::optional) ||
-              modelComputeArgumentsCreate->SetArgumentSupportStatus(
+                  KIM::SUPPORT_STATUS::optional)
+              || modelComputeArgumentsCreate->SetArgumentSupportStatus(
                   KIM::COMPUTE_ARGUMENT_NAME::partialParticleEnergy,
-                  KIM::SUPPORT_STATUS::optional) ||
-              modelComputeArgumentsCreate->SetArgumentSupportStatus(
+                  KIM::SUPPORT_STATUS::optional)
+              || modelComputeArgumentsCreate->SetArgumentSupportStatus(
                   KIM::COMPUTE_ARGUMENT_NAME::partialVirial,
-                  KIM::SUPPORT_STATUS::optional) ||
-              modelComputeArgumentsCreate->SetArgumentSupportStatus(
+                  KIM::SUPPORT_STATUS::optional)
+              || modelComputeArgumentsCreate->SetArgumentSupportStatus(
                   KIM::COMPUTE_ARGUMENT_NAME::partialParticleVirial,
                   KIM::SUPPORT_STATUS::optional);
 
   // register callbacks
   LOG_INFORMATION("Register callback supportStatus");
-  error = error ||
-          modelComputeArgumentsCreate->SetCallbackSupportStatus(
+  error = error
+          || modelComputeArgumentsCreate->SetCallbackSupportStatus(
               KIM::COMPUTE_CALLBACK_NAME::ProcessDEDrTerm,
-              KIM::SUPPORT_STATUS::optional) ||
-          modelComputeArgumentsCreate->SetCallbackSupportStatus(
+              KIM::SUPPORT_STATUS::optional)
+          || modelComputeArgumentsCreate->SetCallbackSupportStatus(
               KIM::COMPUTE_CALLBACK_NAME::ProcessD2EDr2Term,
               KIM::SUPPORT_STATUS::optional);
 
@@ -466,18 +506,22 @@ int ANNImplementation::RegisterKIMComputeArgumentsSettings(
 #undef KIM_LOGGER_OBJECT_NAME
 #define KIM_LOGGER_OBJECT_NAME modelDriverCreate
 int ANNImplementation::RegisterKIMParameters(
-    KIM::ModelDriverCreate *const modelDriverCreate) {
-
+    KIM::ModelDriverCreate * const modelDriverCreate)
+{
   int ier = false;
 
   // publish parameters (order is important)
   ier = modelDriverCreate->SetParameterPointer(
-            1, &ensemble_size_, "ensemble_size",
+            1,
+            &ensemble_size_,
+            "ensemble_size",
             "Size of the ensemble of models. `0` means this is a fully-"
             "connected neural network that does not support running in "
-            "ensemble mode.") ||
-        modelDriverCreate->SetParameterPointer(
-            1, &active_member_id_, "active_member_id",
+            "ensemble mode.")
+        || modelDriverCreate->SetParameterPointer(
+            1,
+            &active_member_id_,
+            "active_member_id",
             "Running mode of the ensemble of models, with available values of "
             "`-1, 0, 1, 2, ..., ensemble_size`. If `ensemble_size = 0`, "
             "this is ignored. Otherwise, `active_member_id = -1` means the "
@@ -489,7 +533,8 @@ int ANNImplementation::RegisterKIMParameters(
             "integer from 1 to `ensemble_size` means ensemble member i will be "
             "used to calculate the output.");
 
-  if (ier) {
+  if (ier)
+  {
     LOG_ERROR("set_parameters");
     return ier;
   }
@@ -501,26 +546,35 @@ int ANNImplementation::RegisterKIMParameters(
 
 //******************************************************************************
 int ANNImplementation::RegisterKIMFunctions(
-    KIM::ModelDriverCreate *const modelDriverCreate) const {
+    KIM::ModelDriverCreate * const modelDriverCreate) const
+{
   int error;
 
   // register functions
   error = modelDriverCreate->SetRoutinePointer(
-              KIM::MODEL_ROUTINE_NAME::Destroy, KIM::LANGUAGE_NAME::cpp, true,
-              reinterpret_cast<KIM::Function *>(ANN::Destroy)) ||
-          modelDriverCreate->SetRoutinePointer(
-              KIM::MODEL_ROUTINE_NAME::Refresh, KIM::LANGUAGE_NAME::cpp, true,
-              reinterpret_cast<KIM::Function *>(ANN::Refresh)) ||
-          modelDriverCreate->SetRoutinePointer(
-              KIM::MODEL_ROUTINE_NAME::Compute, KIM::LANGUAGE_NAME::cpp, true,
-              reinterpret_cast<KIM::Function *>(ANN::Compute)) ||
-          modelDriverCreate->SetRoutinePointer(
+              KIM::MODEL_ROUTINE_NAME::Destroy,
+              KIM::LANGUAGE_NAME::cpp,
+              true,
+              reinterpret_cast<KIM::Function *>(ANN::Destroy))
+          || modelDriverCreate->SetRoutinePointer(
+              KIM::MODEL_ROUTINE_NAME::Refresh,
+              KIM::LANGUAGE_NAME::cpp,
+              true,
+              reinterpret_cast<KIM::Function *>(ANN::Refresh))
+          || modelDriverCreate->SetRoutinePointer(
+              KIM::MODEL_ROUTINE_NAME::Compute,
+              KIM::LANGUAGE_NAME::cpp,
+              true,
+              reinterpret_cast<KIM::Function *>(ANN::Compute))
+          || modelDriverCreate->SetRoutinePointer(
               KIM::MODEL_ROUTINE_NAME::ComputeArgumentsCreate,
-              KIM::LANGUAGE_NAME::cpp, true,
-              reinterpret_cast<KIM::Function *>(ANN::ComputeArgumentsCreate)) ||
-          modelDriverCreate->SetRoutinePointer(
+              KIM::LANGUAGE_NAME::cpp,
+              true,
+              reinterpret_cast<KIM::Function *>(ANN::ComputeArgumentsCreate))
+          || modelDriverCreate->SetRoutinePointer(
               KIM::MODEL_ROUTINE_NAME::ComputeArgumentsDestroy,
-              KIM::LANGUAGE_NAME::cpp, true,
+              KIM::LANGUAGE_NAME::cpp,
+              true,
               reinterpret_cast<KIM::Function *>(ANN::ComputeArgumentsDestroy));
 
   return error;
@@ -529,48 +583,52 @@ int ANNImplementation::RegisterKIMFunctions(
 //******************************************************************************
 #undef KIM_LOGGER_OBJECT_NAME
 #define KIM_LOGGER_OBJECT_NAME modelObj
-template <class ModelObj>
-int ANNImplementation::SetRefreshMutableValues(
-    ModelObj *const modelObj) { // use (possibly) new values of parameters to
-                                // compute other quantities
+template<class ModelObj>
+int ANNImplementation::SetRefreshMutableValues(ModelObj * const modelObj)
+{  // use (possibly) new values of parameters to
+   // compute other quantities
   // NOTE: This function is templated because it's called with both a
   //       modelDriverCreate object during initialization and with a
   //       modelRefresh object when the Model's parameters have been altered
   int ier = true;
 
   // checks to make sure ensemble_size_ and active_member_id_ are correct
-  if (ensemble_size_ != last_ensemble_size_) {
+  if (ensemble_size_ != last_ensemble_size_)
+  {
     LOG_ERROR("Value of `ensemble_size` changed.");
     return ier;
   }
-  if (active_member_id_ < -1 || active_member_id_ > ensemble_size_) {
+  if (active_member_id_ < -1 || active_member_id_ > ensemble_size_)
+  {
     char message[MAXLINE];
-    sprintf(message, "`active_member_id=%d` out of range. Should be [-1, %d]",
-            active_member_id_, ensemble_size_);
+    sprintf(message,
+            "`active_member_id=%d` out of range. Should be [-1, %d]",
+            active_member_id_,
+            ensemble_size_);
     LOG_ERROR(message);
     return ier;
   }
-  if ((last_ensemble_size_ == 0) &&
-      (active_member_id_ != last_active_member_id_)) {
-    LOG_INFORMATION("`active_member_id`ignored since `ensemble_size=0`.");
-  }
+  if ((last_ensemble_size_ == 0)
+      && (active_member_id_ != last_active_member_id_))
+  { LOG_INFORMATION("`active_member_id`ignored since `ensemble_size=0`."); }
   last_active_member_id_ = active_member_id_;
 
   // update influence distance value in KIM API object
   int Nspecies = descriptor_->get_num_species();
   influenceDistance_ = 0.0;
-  for (int i = 0; i < Nspecies; i++) {
-    for (int j = 0; j < Nspecies; j++) {
+  for (int i = 0; i < Nspecies; i++)
+  {
+    for (int j = 0; j < Nspecies; j++)
+    {
       double cutoff = descriptor_->get_cutoff(i, j);
-      if (influenceDistance_ < cutoff) {
-        influenceDistance_ = cutoff;
-      }
+      if (influenceDistance_ < cutoff) { influenceDistance_ = cutoff; }
     }
   }
 
   modelObj->SetInfluenceDistancePointer(&influenceDistance_);
   modelObj->SetNeighborListPointers(
-      1, &influenceDistance_,
+      1,
+      &influenceDistance_,
       &modelWillNotRequestNeighborsOfNoncontributingParticles_);
 
   // everything is good
@@ -582,14 +640,23 @@ int ANNImplementation::SetRefreshMutableValues(
 #undef KIM_LOGGER_OBJECT_NAME
 #define KIM_LOGGER_OBJECT_NAME modelComputeArguments
 int ANNImplementation::SetComputeMutableValues(
-    KIM::ModelComputeArguments const *const modelComputeArguments,
-    bool &isComputeProcess_dEdr, bool &isComputeProcess_d2Edr2,
-    bool &isComputeEnergy, bool &isComputeForces, bool &isComputeParticleEnergy,
-    bool &isComputeVirial, bool &isComputeParticleVirial,
-    int const *&particleSpeciesCodes, int const *&particleContributing,
-    VectorOfSizeDIM const *&coordinates, double *&energy,
-    VectorOfSizeDIM *&forces, double *&particleEnergy, VectorOfSizeSix *&virial,
-    VectorOfSizeSix *&particleVirial) {
+    KIM::ModelComputeArguments const * const modelComputeArguments,
+    bool & isComputeProcess_dEdr,
+    bool & isComputeProcess_d2Edr2,
+    bool & isComputeEnergy,
+    bool & isComputeForces,
+    bool & isComputeParticleEnergy,
+    bool & isComputeVirial,
+    bool & isComputeParticleVirial,
+    int const *& particleSpeciesCodes,
+    int const *& particleContributing,
+    VectorOfSizeDIM const *& coordinates,
+    double *& energy,
+    VectorOfSizeDIM *& forces,
+    double *& particleEnergy,
+    VectorOfSizeSix *& virial,
+    VectorOfSizeSix *& particleVirial)
+{
   int ier = true;
 
   // get compute flags
@@ -604,33 +671,33 @@ int ANNImplementation::SetComputeMutableValues(
   isComputeProcess_dEdr = compProcess_dEdr;
   isComputeProcess_d2Edr2 = compProcess_d2Edr2;
 
-  int const *numberOfParticles;
-  ier =
-      modelComputeArguments->GetArgumentPointer(
-          KIM::COMPUTE_ARGUMENT_NAME::numberOfParticles, &numberOfParticles) ||
-      modelComputeArguments->GetArgumentPointer(
-          KIM::COMPUTE_ARGUMENT_NAME::particleSpeciesCodes,
-          &particleSpeciesCodes) ||
-      modelComputeArguments->GetArgumentPointer(
-          KIM::COMPUTE_ARGUMENT_NAME::particleContributing,
-          &particleContributing) ||
-      modelComputeArguments->GetArgumentPointer(
-          KIM::COMPUTE_ARGUMENT_NAME::coordinates,
-          (double const **)&coordinates) ||
-      modelComputeArguments->GetArgumentPointer(
-          KIM::COMPUTE_ARGUMENT_NAME::partialEnergy, &energy) ||
-      modelComputeArguments->GetArgumentPointer(
-          KIM::COMPUTE_ARGUMENT_NAME::partialForces,
-          (double const **)&forces) ||
-      modelComputeArguments->GetArgumentPointer(
-          KIM::COMPUTE_ARGUMENT_NAME::partialParticleEnergy, &particleEnergy) ||
-      modelComputeArguments->GetArgumentPointer(
-          KIM::COMPUTE_ARGUMENT_NAME::partialVirial,
-          (double const **)&virial) ||
-      modelComputeArguments->GetArgumentPointer(
-          KIM::COMPUTE_ARGUMENT_NAME::partialParticleVirial,
-          (double const **)&particleVirial);
-  if (ier) {
+  int const * numberOfParticles;
+  ier = modelComputeArguments->GetArgumentPointer(
+            KIM::COMPUTE_ARGUMENT_NAME::numberOfParticles, &numberOfParticles)
+        || modelComputeArguments->GetArgumentPointer(
+            KIM::COMPUTE_ARGUMENT_NAME::particleSpeciesCodes,
+            &particleSpeciesCodes)
+        || modelComputeArguments->GetArgumentPointer(
+            KIM::COMPUTE_ARGUMENT_NAME::particleContributing,
+            &particleContributing)
+        || modelComputeArguments->GetArgumentPointer(
+            KIM::COMPUTE_ARGUMENT_NAME::coordinates,
+            (double const **) &coordinates)
+        || modelComputeArguments->GetArgumentPointer(
+            KIM::COMPUTE_ARGUMENT_NAME::partialEnergy, &energy)
+        || modelComputeArguments->GetArgumentPointer(
+            KIM::COMPUTE_ARGUMENT_NAME::partialForces,
+            (double const **) &forces)
+        || modelComputeArguments->GetArgumentPointer(
+            KIM::COMPUTE_ARGUMENT_NAME::partialParticleEnergy, &particleEnergy)
+        || modelComputeArguments->GetArgumentPointer(
+            KIM::COMPUTE_ARGUMENT_NAME::partialVirial,
+            (double const **) &virial)
+        || modelComputeArguments->GetArgumentPointer(
+            KIM::COMPUTE_ARGUMENT_NAME::partialParticleVirial,
+            (double const **) &particleVirial);
+  if (ier)
+  {
     LOG_ERROR("GetArgumentPointer");
     return ier;
   }
@@ -654,13 +721,16 @@ int ANNImplementation::SetComputeMutableValues(
 #undef KIM_LOGGER_OBJECT_NAME
 #define KIM_LOGGER_OBJECT_NAME modelCompute
 int ANNImplementation::CheckParticleSpeciesCodes(
-    KIM::ModelCompute const *const modelCompute,
-    int const *const particleSpeciesCodes) const {
+    KIM::ModelCompute const * const modelCompute,
+    int const * const particleSpeciesCodes) const
+{
   int ier;
 
-  for (int i = 0; i < cachedNumberOfParticles_; ++i) {
-    if ((particleSpeciesCodes[i] < 0) ||
-        (particleSpeciesCodes[i] >= descriptor_->get_num_species())) {
+  for (int i = 0; i < cachedNumberOfParticles_; ++i)
+  {
+    if ((particleSpeciesCodes[i] < 0)
+        || (particleSpeciesCodes[i] >= descriptor_->get_num_species()))
+    {
       ier = true;
       LOG_ERROR("unsupported particle species codes detected");
       return ier;
@@ -674,10 +744,14 @@ int ANNImplementation::CheckParticleSpeciesCodes(
 
 //******************************************************************************
 int ANNImplementation::GetComputeIndex(
-    const bool &isComputeProcess_dEdr, const bool &isComputeProcess_d2Edr2,
-    const bool &isComputeEnergy, const bool &isComputeForces,
-    const bool &isComputeParticleEnergy, const bool &isComputeVirial,
-    const bool &isComputeParticleVirial) const {
+    const bool & isComputeProcess_dEdr,
+    const bool & isComputeProcess_d2Edr2,
+    const bool & isComputeEnergy,
+    const bool & isComputeForces,
+    const bool & isComputeParticleEnergy,
+    const bool & isComputeVirial,
+    const bool & isComputeParticleVirial) const
+{
   // const int processdE = 2;
   const int processd2E = 2;
   const int energy = 2;
@@ -689,16 +763,16 @@ int ANNImplementation::GetComputeIndex(
   int index = 0;
 
   // processdE
-  index += (int(isComputeProcess_dEdr)) * processd2E * energy * force *
-           particleEnergy * virial * particleVirial;
+  index += (int(isComputeProcess_dEdr)) * processd2E * energy * force
+           * particleEnergy * virial * particleVirial;
 
   // processd2E
-  index += (int(isComputeProcess_d2Edr2)) * energy * force * particleEnergy *
-           virial * particleVirial;
+  index += (int(isComputeProcess_d2Edr2)) * energy * force * particleEnergy
+           * virial * particleVirial;
 
   // energy
-  index +=
-      (int(isComputeEnergy)) * force * particleEnergy * virial * particleVirial;
+  index += (int(isComputeEnergy)) * force * particleEnergy * virial
+           * particleVirial;
 
   // force
   index += (int(isComputeForces)) * particleEnergy * virial * particleVirial;
@@ -713,69 +787,4 @@ int ANNImplementation::GetComputeIndex(
   index += (int(isComputeParticleVirial));
 
   return index;
-}
-
-//==============================================================================
-//
-// LJ functions
-//
-//==============================================================================
-
-void ANNImplementation::calc_phi(double const epsilon, double const sigma,
-                                 double const cutoff, double const r,
-                                 double *const phi) const {
-  double sor, sor6, sor12;
-
-  if (r >= cutoff) {
-    *phi = 0;
-  } else {
-    sor = sigma / r;
-    sor6 = sor * sor * sor;
-    sor6 = sor6 * sor6;
-    // sor12= sor6*sor6;
-    sor12 = 0;
-    *phi = 4.0 * epsilon * (sor12 - sor6);
-  }
-}
-
-void ANNImplementation::calc_phi_dphi(double const epsilon, double const sigma,
-                                      double const cutoff, double const r,
-                                      double *const phi,
-                                      double *const dphi) const {
-  double sor, sor6, sor12;
-
-  if (r >= cutoff) {
-    *phi = 0;
-    *dphi = 0;
-  } else {
-    sor = sigma / r;
-    sor6 = sor * sor * sor;
-    sor6 = sor6 * sor6;
-    // sor12= sor6*sor6;
-    sor12 = 0;
-    *phi = 4.0 * epsilon * (sor12 - sor6);
-    *dphi = 24.0 * epsilon * (-2.0 * sor12 + sor6) / r;
-  }
-}
-
-void ANNImplementation::switch_fn(double const x_min, double const x_max,
-                                  double const x, double *const fn,
-                                  double *const fn_prime) const {
-  double t;
-  double t_sq;
-  double t_cubic;
-
-  if (x <= x_min) {
-    *fn = 1;
-    *fn_prime = 0;
-  } else if (x >= x_max) {
-    *fn = 0;
-    *fn_prime = 0;
-  } else {
-    t = (x - x_min) / (x_max - x_min);
-    t_sq = t * t;
-    t_cubic = t_sq * t;
-    *fn = t_cubic * (-10.0 + 15 * t - 6 * t_sq) + 1;
-    *fn_prime = t_sq * (-30 + 60 * t - 30 * t_sq) / (x_max - x_min);
-  }
 }

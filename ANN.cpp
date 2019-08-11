@@ -43,21 +43,27 @@
 
 //******************************************************************************
 extern "C" {
-int model_driver_create(KIM::ModelDriverCreate *const modelDriverCreate,
+int model_driver_create(KIM::ModelDriverCreate * const modelDriverCreate,
                         KIM::LengthUnit const requestedLengthUnit,
                         KIM::EnergyUnit const requestedEnergyUnit,
                         KIM::ChargeUnit const requestedChargeUnit,
                         KIM::TemperatureUnit const requestedTemperatureUnit,
-                        KIM::TimeUnit const requestedTimeUnit) {
+                        KIM::TimeUnit const requestedTimeUnit)
+{
   int ier;
 
   // read input files, convert units if needed, compute
   // interpolation coefficients, set cutoff, and publish parameters
-  ANN *const modelObject = new ANN(
-      modelDriverCreate, requestedLengthUnit, requestedEnergyUnit,
-      requestedChargeUnit, requestedTemperatureUnit, requestedTimeUnit, &ier);
+  ANN * const modelObject = new ANN(modelDriverCreate,
+                                    requestedLengthUnit,
+                                    requestedEnergyUnit,
+                                    requestedChargeUnit,
+                                    requestedTemperatureUnit,
+                                    requestedTimeUnit,
+                                    &ier);
 
-  if (ier) {
+  if (ier)
+  {
     // constructor already reported the error
     delete modelObject;
     return ier;
@@ -79,15 +85,21 @@ int model_driver_create(KIM::ModelDriverCreate *const modelDriverCreate,
 //==============================================================================
 
 //******************************************************************************
-ANN::ANN(KIM::ModelDriverCreate *const modelDriverCreate,
+ANN::ANN(KIM::ModelDriverCreate * const modelDriverCreate,
          KIM::LengthUnit const requestedLengthUnit,
          KIM::EnergyUnit const requestedEnergyUnit,
          KIM::ChargeUnit const requestedChargeUnit,
          KIM::TemperatureUnit const requestedTemperatureUnit,
-         KIM::TimeUnit const requestedTimeUnit, int *const ier) {
-  implementation_ = new ANNImplementation(
-      modelDriverCreate, requestedLengthUnit, requestedEnergyUnit,
-      requestedChargeUnit, requestedTemperatureUnit, requestedTimeUnit, ier);
+         KIM::TimeUnit const requestedTimeUnit,
+         int * const ier)
+{
+  implementation_ = new ANNImplementation(modelDriverCreate,
+                                          requestedLengthUnit,
+                                          requestedEnergyUnit,
+                                          requestedChargeUnit,
+                                          requestedTemperatureUnit,
+                                          requestedTimeUnit,
+                                          ier);
 }
 
 //******************************************************************************
@@ -95,12 +107,14 @@ ANN::~ANN() { delete implementation_; }
 
 //******************************************************************************
 // static member function
-int ANN::Destroy(KIM::ModelDestroy *const modelDestroy) {
-  ANN *modelObject;
+int ANN::Destroy(KIM::ModelDestroy * const modelDestroy)
+{
+  ANN * modelObject;
 
   modelDestroy->GetModelBufferPointer(reinterpret_cast<void **>(&modelObject));
 
-  if (modelObject != NULL) {
+  if (modelObject != NULL)
+  {
     // delete object itself
     delete modelObject;
   }
@@ -111,8 +125,9 @@ int ANN::Destroy(KIM::ModelDestroy *const modelDestroy) {
 
 //******************************************************************************
 // static member function
-int ANN::Refresh(KIM::ModelRefresh *const modelRefresh) {
-  ANN *modelObject;
+int ANN::Refresh(KIM::ModelRefresh * const modelRefresh)
+{
+  ANN * modelObject;
 
   modelRefresh->GetModelBufferPointer(reinterpret_cast<void **>(&modelObject));
 
@@ -121,10 +136,10 @@ int ANN::Refresh(KIM::ModelRefresh *const modelRefresh) {
 
 //******************************************************************************
 // static member function
-int ANN::Compute(
-    KIM::ModelCompute const *const modelCompute,
-    KIM::ModelComputeArguments const *const modelComputeArguments) {
-  ANN *modelObject;
+int ANN::Compute(KIM::ModelCompute const * const modelCompute,
+                 KIM::ModelComputeArguments const * const modelComputeArguments)
+{
+  ANN * modelObject;
 
   modelCompute->GetModelBufferPointer(reinterpret_cast<void **>(&modelObject));
 
@@ -135,9 +150,10 @@ int ANN::Compute(
 //******************************************************************************
 // static member function
 int ANN::ComputeArgumentsCreate(
-    KIM::ModelCompute const *const modelCompute,
-    KIM::ModelComputeArgumentsCreate *const modelComputeArgumentsCreate) {
-  ANN *modelObject;
+    KIM::ModelCompute const * const modelCompute,
+    KIM::ModelComputeArgumentsCreate * const modelComputeArgumentsCreate)
+{
+  ANN * modelObject;
 
   modelCompute->GetModelBufferPointer(reinterpret_cast<void **>(&modelObject));
 
@@ -148,9 +164,10 @@ int ANN::ComputeArgumentsCreate(
 //******************************************************************************
 // static member function
 int ANN::ComputeArgumentsDestroy(
-    KIM::ModelCompute const *const modelCompute,
-    KIM::ModelComputeArgumentsDestroy *const modelComputeArgumentsDestroy) {
-  ANN *modelObject;
+    KIM::ModelCompute const * const modelCompute,
+    KIM::ModelComputeArgumentsDestroy * const modelComputeArgumentsDestroy)
+{
+  ANN * modelObject;
 
   modelCompute->GetModelBufferPointer(reinterpret_cast<void **>(&modelObject));
 
