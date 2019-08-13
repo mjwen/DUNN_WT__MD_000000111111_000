@@ -451,15 +451,18 @@ int Descriptor::get_num_descriptors()
 // w.r.t. the coordinates of atom i.
 //*****************************************************************************
 
-void Descriptor::generate_one_atom(const int i,
-                                   const VectorOfSizeDIM * const coordinates,
-                                   const int * particleSpeciesCodes,
-                                   const int * neighlist,
-                                   const int numnei,
+void Descriptor::generate_one_atom(int const i,
+                                   double const * coords,
+                                   int const * particleSpeciesCodes,
+                                   int const * neighlist,
+                                   int const numnei,
                                    double * const desc,
                                    double * const grad_desc,
                                    bool grad)
 {
+  // prepare data
+  VectorOfSizeDIM * coordinates = (VectorOfSizeDIM *) coords;
+
   int const iSpecies = particleSpeciesCodes[i];
 
   // Setup loop over neighbors of current particle
@@ -781,9 +784,7 @@ void Descriptor::sym_d_g4(double zeta,
     double determ_djk = -2 * eterm * eta * rjk;
 
     // power 2 term
-    // double p2 = pow(2, 1 - zeta);
-    int tmp = 1 << (int) zeta;  // compute 2^(zeta)
-    double p2 = 2. / tmp;  // compute 2^(1-zeta)
+    double p2 = pow(2, 1 - zeta);
 
     // cutoff_func
     double fcij = cutoff_func_(rij, rcutij);
@@ -884,8 +885,9 @@ void Descriptor::sym_d_g5(double zeta,
     double costerm;
     double dcosterm_dcos;
     double base = 1 + lambda * cos_ijk;
+// prevent numerical instability (when lambda=-1 and cos_ijk=1)
     if (base <= 0)
-    {  // prevent numerical instability (when lambda=-1 and cos_ijk=1)
+    {
       costerm = 0.0;
       dcosterm_dcos = 0.0;
     }

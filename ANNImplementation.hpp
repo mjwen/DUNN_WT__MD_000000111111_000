@@ -313,7 +313,7 @@ int ANNImplementation::Compute(
     }
 
     descriptor_->generate_one_atom(i,
-                                   coordinates,
+                                   reinterpret_cast<double const *>(coordinates),
                                    particleSpeciesCodes,
                                    n1atom,
                                    numnei,

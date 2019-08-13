@@ -87,7 +87,7 @@ class Descriptor
   inline bool need_normalize() { return normalize_; };
 
   void generate_one_atom(int const i,
-                         VectorOfSizeDIM const * const coordinates,
+                         double const * coordinates,
                          int const * particleSpeciesCode,
                          int const * neighlist,
                          int const numnei,
