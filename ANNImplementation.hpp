@@ -75,6 +75,8 @@ class ANNImplementation
   //
   // ANNImplementation: constants
 
+  double energyScale_;
+
   // Constant values that are read from the input files and never change
   //   Set in constructor (via functions listed below)
   // none
@@ -312,14 +314,15 @@ int ANNImplementation::Compute(
           dGCdr, Ndescriptors, (numnei + 1) * DIM);
     }
 
-    descriptor_->generate_one_atom(i,
-                                   reinterpret_cast<double const *>(coordinates),
-                                   particleSpeciesCodes,
-                                   n1atom,
-                                   numnei,
-                                   GC,
-                                   dGCdr[0],
-                                   need_dE);
+    descriptor_->generate_one_atom(
+        i,
+        reinterpret_cast<double const *>(coordinates),
+        particleSpeciesCodes,
+        n1atom,
+        numnei,
+        GC,
+        dGCdr[0],
+        need_dE);
 
     // centering and normalization
     if (descriptor_->need_normalize())
@@ -415,10 +418,11 @@ int ANNImplementation::Compute(
     }
 
     // Contribution to energy
-    if (isComputeEnergy == true) { *energy += E; }
+    if (isComputeEnergy == true) { *energy += energyScale_ * E; }
 
     // Contribution to particle energy
-    if (isComputeParticleEnergy == true) { particleEnergy[i] += E; }
+    if (isComputeParticleEnergy == true)
+    { particleEnergy[i] += energyScale_ * E; }
 
     // Contribution to forces, particle virial, and virial
     if (need_dE == true)
@@ -443,20 +447,20 @@ int ANNImplementation::Compute(
 
           if (isComputeForces == true)
           {
-            forces[idx][0] += f[0];
-            forces[idx][1] += f[1];
-            forces[idx][2] += f[2];
+            forces[idx][0] += energyScale_ * f[0];
+            forces[idx][1] += energyScale_ * f[1];
+            forces[idx][2] += energyScale_ * f[2];
           }
 
           if (isComputeParticleVirial == true || isComputeVirial == true)
           {
             VectorOfSizeSix v;
-            v[0] = -f[0] * coordinates[idx][0];
-            v[1] = -f[1] * coordinates[idx][1];
-            v[2] = -f[2] * coordinates[idx][2];
-            v[3] = -f[1] * coordinates[idx][2];
-            v[4] = -f[2] * coordinates[idx][0];
-            v[5] = -f[0] * coordinates[idx][1];
+            v[0] = -energyScale_ * f[0] * coordinates[idx][0];
+            v[1] = -energyScale_ * f[1] * coordinates[idx][1];
+            v[2] = -energyScale_ * f[2] * coordinates[idx][2];
+            v[3] = -energyScale_ * f[1] * coordinates[idx][2];
+            v[4] = -energyScale_ * f[2] * coordinates[idx][0];
+            v[5] = -energyScale_ * f[0] * coordinates[idx][1];
             if (isComputeParticleVirial == true)
             {
               particleVirial[idx][0] += v[0];

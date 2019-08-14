@@ -443,6 +443,45 @@ int Descriptor::get_num_descriptors()
   return N;
 }
 
+void Descriptor::convert_units(double convertEnergy, double convertLength)
+{
+
+  (void) convertEnergy; // avoid unused warning
+
+  // parameters
+  for (size_t p = 0; p < name_.size(); p++)
+  {
+    for (int q = 0; q < num_param_sets_[p]; q++)
+    {
+      if (name_[p] == "g2")
+      {
+        params_[p][q][0] /= convertLength * convertLength;  // eta
+        params_[p][q][1] *= convertLength;  // Rs
+      }
+      if (name_[p] == "g3")
+      {
+        params_[p][q][0] /= convertLength;  // kappa
+      }
+      if (name_[p] == "g4")
+      {
+        params_[p][q][2] /= convertLength * convertLength;  // eta
+      }
+      if (name_[p] == "g5")
+      {
+        params_[p][q][2] /= convertLength * convertLength;  // eta
+      }
+    }
+  }
+
+  // cutoff
+  int N = get_num_species();
+  for (int p = 0; p < N; p++)
+  {
+    for (int q = 0; q < N; q++) { rcut_2D_[p][q] *= convertLength; }
+  }
+}
+
+
 //*****************************************************************************
 // Compute the descriptor values and their derivatives w.r.t. the coordinates of
 // atom i and its neighbors.
@@ -885,7 +924,7 @@ void Descriptor::sym_d_g5(double zeta,
     double costerm;
     double dcosterm_dcos;
     double base = 1 + lambda * cos_ijk;
-// prevent numerical instability (when lambda=-1 and cos_ijk=1)
+    // prevent numerical instability (when lambda=-1 and cos_ijk=1)
     if (base <= 0)
     {
       costerm = 0.0;

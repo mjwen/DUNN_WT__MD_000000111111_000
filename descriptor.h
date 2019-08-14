@@ -95,6 +95,9 @@ class Descriptor
                          double * const grad_desc,
                          bool grad);
 
+  void convert_units(double convertEnergy, double convertLength);
+
+
  private:
   std::vector<std::string> species_;
   double ** rcut_2D_;
@@ -103,8 +106,7 @@ class Descriptor
   std::vector<int> starting_index_;  // starting index of each descriptor
                                      // in generalized coords
   std::vector<double **> params_;  // params of each descriptor
-  std::vector<int>
-      num_param_sets_;  // number of parameter sets of each descriptor
+  std::vector<int> num_param_sets_;  // num of parameter sets of each descriptor
   std::vector<int> num_params_;  // size of parameters of each descriptor
   bool has_three_body_;
 

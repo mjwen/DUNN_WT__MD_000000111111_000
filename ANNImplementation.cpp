@@ -53,6 +53,7 @@ ANNImplementation::ANNImplementation(
     KIM::TemperatureUnit const requestedTemperatureUnit,
     KIM::TimeUnit const requestedTimeUnit,
     int * const ier) :
+    energyScale_(1.0),
     ensemble_size_(0),
     last_ensemble_size_(0),
     active_member_id_(-1),
@@ -384,7 +385,6 @@ int ANNImplementation::ConvertUnits(
   KIM::TemperatureUnit fromTemperature = KIM::TEMPERATURE_UNIT::K;
   KIM::TimeUnit fromTime = KIM::TIME_UNIT::ps;
 
-  // changing units of sigma, gamma, and cutoff
   double convertLength = 1.0;
 
   ier = modelDriverCreate->ConvertUnit(fromLength,
@@ -408,10 +408,7 @@ int ANNImplementation::ConvertUnits(
     LOG_ERROR("Unable to convert length unit");
     return ier;
   }
-  // convert to active units
-  if (convertLength != ONE) {}
 
-  // changing units of A and lambda
   double convertEnergy = 1.0;
   ier = modelDriverCreate->ConvertUnit(fromLength,
                                        fromEnergy,
@@ -434,8 +431,13 @@ int ANNImplementation::ConvertUnits(
     LOG_ERROR("Unable to convert energy unit");
     return ier;
   }
+
   // convert to active units
-  if (convertEnergy != ONE) {}
+  if (convertEnergy != ONE or convertLength != ONE)
+  {
+    descriptor_->convert_units(convertEnergy, convertLength);
+    energyScale_ = convertEnergy;
+  }
 
   // register units
   ier = modelDriverCreate->SetUnits(requestedLengthUnit,
