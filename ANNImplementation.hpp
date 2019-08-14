@@ -483,7 +483,9 @@ int ANNImplementation::Compute(
     // deallocate memory
     Deallocate1DArray(GC);
     if (need_dE) { Deallocate2DArray(dGCdr); }
-    if (active_member_id_ == -1 and need_dE) { Deallocate1DArray(dEdGC); }
+    if (need_dE && (ensemble_size_ != 0) && (active_member_id_ == -1)) {
+      Deallocate1DArray(dEdGC);
+    }
 
   }  // loop over i
 

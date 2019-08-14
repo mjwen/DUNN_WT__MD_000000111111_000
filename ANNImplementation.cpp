@@ -347,8 +347,7 @@ int ANNImplementation::ProcessParameterFiles(
     return true;
   }
   ensemble_size_ = last_ensemble_size_ = network_->get_ensemble_size();
-  active_member_id_ = last_active_member_id_
-      = -1;  // default to average the output
+  active_member_id_ = last_active_member_id_ = -1;  // default to average
 
   // everything is good
   ier = false;
